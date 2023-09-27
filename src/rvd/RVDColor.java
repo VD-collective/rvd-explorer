@@ -4,7 +4,7 @@ import javafx.scene.paint.Color;
 
 public class RVDColor {
 	public static RVDColor BLACK = new RVDColor(0.0);
-	public static RVDColor GRAY  = new RVDColor(0.125);
+	public static RVDColor GRAY  = new RVDColor(0.2);
 	public static RVDColor WHITE = new RVDColor(1.0);
 	
 	private final int r, g, b;

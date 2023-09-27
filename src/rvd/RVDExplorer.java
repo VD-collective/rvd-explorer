@@ -54,7 +54,7 @@ public class RVDExplorer implements Drawing {
 	
 	@GadgetInteger(min = 1, max = maxN)
 	@Properties(name = "Number of sites")
-	int n = 3;
+	int n = 7;
 	
 	
 	@Properties(name = "Diagram type (F2-5)")
@@ -66,8 +66,8 @@ public class RVDExplorer implements Drawing {
 	boolean polygonMode = true;
 	
 	@GadgetBoolean
-	@Properties(name = "Left side only (m)")
-	boolean leftSideOnly = false;
+	@Properties(name = "Show polygon exterior (x)")
+	boolean showPolygonExterior = false;
 	
 
 	@GadgetBoolean
@@ -190,12 +190,17 @@ public class RVDExplorer implements Drawing {
 				hue(k),
 				selected ? 0.2 : 0.8,
 				selected ? 1.0 : 0.6,
-				enabled ? 1.0 : 0.2
+				enabled ? 1.0 : 0.4
 		);
 	}
 	
-	private Color colorFill(int k) {
-		return Color.hsb(hue(k), 0.7, 1);
+	private Color colorFill(int k, boolean enabled) {
+		return Color.hsb(
+				hue(k),
+				0.7,
+				1.0,
+				enabled ? 1.0 : 0.0
+		);
 	}
 	
 	
@@ -214,11 +219,20 @@ public class RVDExplorer implements Drawing {
 	}
 	
 	
-	private boolean visibleThroughThePolygon(Vector a, Vector b) {
-		LineSegment ab = LineSegment.pq(a, b);
+	private boolean visibleThroughThePolygon(Vector p, int k) {
+		LineSegment ab = LineSegment.pq(p, points[k]);
 		
-		for (int k = 0; k < n; k++) {
-			LineSegment edge = LineSegment.pq(points[k], points[(k + 1) % n]);
+		if (!showPolygonExterior) {
+			if (ab.d().angleBetween(polygon.e(k-1).d(), polygon.e(k).d().inverse())) {
+				return false;
+			}
+		}
+		
+		for (int i = 0; i < n; i++) {
+			if ((i == k) || ((i + 1) % n == k)) {
+				continue;
+			}
+			LineSegment edge = LineSegment.pq(points[i], points[(i + 1) % n]);
 			
 			if (Geometry.intersecting(ab, edge)) {
 				return false;
@@ -231,7 +245,7 @@ public class RVDExplorer implements Drawing {
 	private int[] visibleVertices(Vector p) {
 		ArrayInts vs = new ArrayInts(n);
 		for (int k = 0; k < n; k++) {
-			if (!polygonMode || visibleThroughThePolygon(p, points[k])) {
+			if (!polygonMode || visibleThroughThePolygon(p, k)) {
 				vs.add(k);
 			}
 		}
@@ -256,11 +270,6 @@ public class RVDExplorer implements Drawing {
 				Vector o = p.sub(rays[k].p());
 				Vector e = rays[k].d();
 				Vector r = Vector.xy(e.dot(o), e.cross(o));
-				
-				if (leftSideOnly && (r.y() < 0)) {
-					bestK = -1;
-					break;
-				}
 				
 				if (r.angleBefore(bestR)) {
 					bestR = r;
@@ -373,6 +382,8 @@ public class RVDExplorer implements Drawing {
 			for (int i = 0; i < n; i++) {
 				angles[i] = points[(i + 1) % n].sub(points[i]).angle();
 			}
+
+			polygon = Polygon.of(points, n);
 		}
 		
 		Ray[] rays = new Ray[n];
@@ -527,12 +538,22 @@ public class RVDExplorer implements Drawing {
 					Vector oq = loq.d();
 					
 					if (!oq.sameSide(pq, qr)) {
-						double t = polygon.intersectionTimeFirst(loq, 0);
-						if (t >= 1) {
-							t = polygon.intersectionTimeFirst(loq, 1);
+						double t = polygon.intersectionTimeFirst(loq, 0.000001);
+						if (t >= 0.999999) {
+							t = polygon.intersectionTimeFirst(loq, 1.000001);
 							view.strokeLineSegment(loq.segment(Interval.pq(1, t)));
 						}
 					}
+					
+/*
+					if (!oq.sameSide(pq, qr)) {
+						double k = polygon.intersectionSideFirst(loq, 0);
+						if ((k == iq) || (((k + 1) % polygon.size()) == iq)) {
+							double t = polygon.intersectionTimeFirst(loq, 1);
+							view.strokeLineSegment(loq.segment(Interval.pq(1, t)));
+						}
+					}
+*/
 				}
 			}
 		}
@@ -543,7 +564,7 @@ public class RVDExplorer implements Drawing {
 		view.setLineWidth(strokeWidth * pixelWidth);
 		
 		for (int k = 0; k < n; k++) {
-			view.setFill(colorFill(k));
+			view.setFill(colorFill(k, enabled[k]));
 			view.fillCircleCentered(points[k], rPoint * pixelWidth);
 			
 			view.setStroke(colorStroke(k, enabled[k], k == kSelected));
@@ -595,7 +616,7 @@ public class RVDExplorer implements Drawing {
 				"Controls:",
 				"    Mouse left      - Select a ray; Move the initial point of the selected ray",
 				"    Mouse right     - Set the angle of the selected ray",
-				"    Mouse wheel     - Toggle if the selected ray is enabled",
+				"    E               - Toggle if the ray originating near the pointer is enabled",
 				"    Y               - Toggle polygon mode",
 				"    F2              - Show RVD for rays",
 				"    F3              - Show RVD for lines",
@@ -604,11 +625,11 @@ public class RVDExplorer implements Drawing {
 				"    F8              - Toggle grid",
 				"    G               - Toggle snap to grid",
 				"    D               - Toggle show diagram",
-				"    M               - Toggle show only the area on the left of all active rays",
 				"    C               - Toggle show circles",
 				"    R               - Toggle show rays",
 				"    P               - Toggle show points",
 				"    V               - Toggle show visibility cells",
+				"    X               - Toggle show polygon exterior",
 				"    S               - Toggle shading",
 				"    L               - Toggle color",
 				"    H               - Toggle show help",
@@ -654,10 +675,7 @@ public class RVDExplorer implements Drawing {
 		DrawingUtils.clear(view, Color.gray(0.9));
 		
 		if (showDiagram        ) drawDiagram(view, diagramChanged);
-		if (polygonMode        ) {
-			polygon = Polygon.of(points, n);
-			drawPolygon(view);
-		}
+		if (polygonMode        ) drawPolygon(view);
 		if (showVisibilityCells) drawVisibilityCells(view);
 		if (showCircles        ) drawCircles(view);
 		if (showRays           ) drawRays(view);
@@ -692,7 +710,7 @@ public class RVDExplorer implements Drawing {
 	
 	boolean dragging = false;
 	Vector draggingStartPoint;
-	double mouseReach = 10;
+	double mouseReach = 12;
 	double draggingMinDistance = 1;
 	
 	
@@ -738,9 +756,12 @@ public class RVDExplorer implements Drawing {
 			diagramChanged = true;
 		}
 		
-		if (event.isMouseWheel() && kSelected >= 0) {
-			enabled[kSelected] ^= true;
-			diagramChanged = true;
+		if (event.isKeyPress(KeyCode.E)) {
+			int k = nearestK(pointerWorld, mouseReach * pixelWidth);
+			if (k >= 0) {
+				enabled[k] ^= true;
+				diagramChanged = true;
+			}
 		}
 		
 		if (event.isKeyPress(KeyCode.G))   snapToGrid               ^= true;
@@ -752,8 +773,8 @@ public class RVDExplorer implements Drawing {
 		if (event.isKeyPress(KeyCode.D)) { showDiagram              ^= true; diagramChanged |= showDiagram; }
 		if (event.isKeyPress(KeyCode.L)) { showColor                ^= true; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.S)) { showShading              ^= true; diagramChanged = true; }
-		if (event.isKeyPress(KeyCode.Y)) { polygonMode ^= true; diagramChanged = true; }
-		if (event.isKeyPress(KeyCode.M)) { leftSideOnly             ^= true; diagramChanged = true; }
+		if (event.isKeyPress(KeyCode.Y)) { polygonMode              ^= true; diagramChanged = true; }
+		if (event.isKeyPress(KeyCode.X)) { showPolygonExterior      ^= true; diagramChanged = true; }
 		
 		if (event.isKeyPress(KeyCode.F2)) { diagram = DiagramType.RVD_RAYS               ; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.F3)) { diagram = DiagramType.RVD_LINES              ; diagramChanged = true; }
