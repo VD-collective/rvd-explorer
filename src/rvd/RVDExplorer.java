@@ -5,6 +5,7 @@ import javafx.scene.image.PixelBuffer;
 import javafx.scene.image.PixelFormat;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.StrokeLineJoin;
 import xyz.marsavic.drawingfx.application.DrawingApplication;
 import xyz.marsavic.drawingfx.application.Options;
 import xyz.marsavic.drawingfx.drawing.Drawing;
@@ -18,6 +19,7 @@ import xyz.marsavic.input.InputEvent;
 import xyz.marsavic.input.InputState;
 import xyz.marsavic.input.KeyCode;
 import xyz.marsavic.random.sampling.Sampler;
+import xyz.marsavic.utils.Hash;
 import xyz.marsavic.utils.Numeric;
 import xyz.marsavic.utils.performance.ApproximateNumeric;
 import xyz.marsavic.utils.performance.ArrayInts;
@@ -32,7 +34,7 @@ import java.util.stream.IntStream;
 
 
 enum DiagramType {
-	RVD_RAYS, RVD_LINES, RVD_BIDIRECTIONAL_RAYS, DISK_DIAGRAM
+	RVD_RAYS_ORIENTED, RVD_RAYS_UNORIENTED, RVD_LINES, DISK_DIAGRAM
 }
 
 
@@ -47,64 +49,90 @@ public class RVDExplorer implements Drawing {
 	boolean showHelp = false;
 	
 	@GadgetString
-	String dataString = "";
-	
-	@GadgetAnimation(p = 0, q = 1, loop = true, speed = 0.05, start = false)
-	double rotate = 0.0;
+	@Properties(name = "Data String")
+	String dataString = "rO0ABXoAAAHOAAAAAAAAAAAAAAASQE+AAAAAAADANgAAAAAAAD/RI++HH+QVAUA5AAAAAAAAQHPAAAAAAAA/4Pne7C5yLAHARQAAAAAAAEBy8AAAAAAAP+gyHxB0iNkBwD0AAAAAAADAQYAAAAAAAD/TRHIvdh0DAcBgYAAAAAAAQHEAAAAAAAA/4kplNrs9TwHAZ6AAAAAAAEBugAAAAAAAP+j+t2xMBQABwFyAAAAAAADAYOAAAAAAAD/XOrCUFp4CAcBuQAAAAAAAQCwAAAAAAAA/4oc8EYd5zgHAc6AAAAAAAMA5AAAAAAAAP+ru8xZW8P0BwGkgAAAAAADAaOAAAAAAAD/sTJsOBK9AAcBXQAAAAAAAwHJwAAAAAAA/dTFG2BgVNwFAYyAAAAAAAMBx8AAAAAAAP8WHD651nQIBQGkgAAAAAADAaUAAAAAAAD/Jt2jYeCQXAUBy4AAAAAAAQFzAAAAAAAA/2XICjs75hAFAcCAAAAAAAEBigAAAAAAAP+VYCjrljjYBQGNAAAAAAADAQIAAAAAAAD/MrdmdrBhQAUBpgAAAAAAAQHDwAAAAAAA/3G85j2AqXQFAYaAAAAAAAEByYAAAAAAAP+bEe81fa/AB";
 	
 	@GadgetInteger(min = 1, max = maxN)
 	@Properties(name = "Number of sites")
 	int n = 7;
 	
+	@GadgetAnimation(p = 0, q = 1, loop = true, speed = 0.05, start = false)
+	@Properties(name = "Rotate rays")
+	double rotate = 0.0;
+
+	@GadgetDouble
+	@Properties(name = "Max aperture")
+	double stopAngle1 = 1;
+
+	@GadgetDouble
+	@Properties(name = "Current aperture (%)")
+	double stopAngle2 = 1;
+	
 	
 	@Properties(name = "Diagram type (F2-5)")
 	@GadgetEnum(enumClass = DiagramType.class)
-	DiagramType diagram = DiagramType.RVD_RAYS;
-	
+	DiagramType diagram = DiagramType.RVD_RAYS_ORIENTED;
+
 	@GadgetBoolean
 	@Properties(name = "Polygon mode (y)")
 	boolean polygonMode = true;
 	
+	
+	@GadgetBoolean
+	@Properties(name = "Show diagram (d)")
+	boolean showDiagram = true;
+	
+	@GadgetBoolean
+	@Properties(name = "Show diagram skeleton (k)")
+	boolean showDiagramSkeleton = false;
+	
+	@GadgetBoolean
+	@Properties(name = "Show points of the maximum angle (b)")
+	boolean showBrocardPoint = false;
+	
+	@GadgetBoolean
+	@Properties(name = "Show distance shading (s)")
+	boolean showShading = true;
+	
+	@GadgetBoolean
+	@Properties(name = "Color regions (l)")
+	boolean showColor = true;
+	
+
+	@GadgetBoolean
+	@Properties(name = "Show sites (p)")
+	boolean showPoints = true;
+	
+	@GadgetBoolean
+	@Properties(name = "Show rays (r)")
+	boolean showRays = false;
+	
+	@GadgetBoolean
+	@Properties(name = "Show circles (c)")
+	boolean showCircles = false;
+	
+
+
 	@GadgetBoolean
 	@Properties(name = "Show polygon exterior (x)")
 	boolean showPolygonExterior = false;
 	
+	@GadgetBoolean
+	@Properties(name = "Show visibility cells (v)")
+	boolean showVisibilityCells = false;
 
+	@GadgetBoolean
+	@Properties(name = "Show visibility cells depth")
+	boolean visibilityCellsShadingCount = true;
+	
+
+	@GadgetColorPicker
+	@Properties(name = "Background color")
+	Color colorBackground = Color.gray(0.2);
+	
 	@GadgetBoolean
 	@Properties(name = "Snap to grid (g)")
 	boolean snapToGrid = false;
-	
-	@GadgetBoolean
-	@Properties(name = "Diagram (d)")
-	boolean showDiagram = true;
-	
-	@GadgetBoolean
-	@Properties(name = "Points (p)")
-	boolean showPoints = true;
-	
-	@GadgetBoolean
-	@Properties(name = "Rays (r)")
-	boolean showRays = false;
-	
-	@GadgetBoolean
-	@Properties(name = "Circles (c)")
-	boolean showCircles = false;
-	
-	@GadgetBoolean
-	@Properties(name = "Color (l)")
-	boolean showColor = true;
-	
-	@GadgetBoolean
-	@Properties(name = "Shading (s)")
-	boolean showShading = true;
-	
-	@GadgetBoolean
-	@Properties(name = "Visibility cells (v)")
-	boolean showVisibilityCells = true;
-
-	@GadgetBoolean
-	@Properties(name = "Visibility cell depth")
-	boolean visibilityCellsShadingCount = true;
 	
 	
 	
@@ -112,10 +140,14 @@ public class RVDExplorer implements Drawing {
 	
 	Vector[] points = new Vector[maxN];
 	double[] angles = new double[maxN];
+	double[] hues = new double[maxN];
+	
 	boolean[] enabled = new boolean[maxN];
 	int kSelected = -1;
 	
 	private Polygon polygon;
+
+	RVDColor rvdColorBackground;
 	
 	
 	CameraSimple camera = new CameraSimple(F_R_R.cutoff01(t -> F_R_R.power(t, 8)));
@@ -166,14 +198,15 @@ public class RVDExplorer implements Drawing {
 	
 	
 	{
-		Sampler sampler = new Sampler();
+		Sampler sampler = new Sampler(new Hash(0x5C727CC650E510C7L));
 		
 		Box box = Box.cr(sizeInitial.div(2));
 		for (int k = 0; k < maxN; k++) {
 			points[k] = sampler.randomInBox(box.scaleFromCenter(2.0/3));
 //			points[k] = sampler.randomGaussian(box.r().min() / 2);
-			angles[k] = sampler.rng().nextDouble();
+			angles[k] = sampler.uniform();
 			enabled[k] = true;
+			hues[k] = 360 * k * Numeric.PHI;
 		}
 	}
 	
@@ -187,7 +220,16 @@ public class RVDExplorer implements Drawing {
 	
 	private Color colorStroke(int k, boolean enabled, boolean selected) {
 		return Color.hsb(
-				hue(k),
+				hues[k],
+				selected ? 0.0 : 1.0,
+				selected ? 1.0 : 0.0,
+				enabled ? 1.0 : 0.4
+		);
+	}
+	
+	private Color colorStrokeRay(int k, boolean enabled, boolean selected) {
+		return Color.hsb(
+				hues[k],
 				selected ? 0.2 : 0.8,
 				selected ? 1.0 : 0.6,
 				enabled ? 1.0 : 0.4
@@ -196,7 +238,7 @@ public class RVDExplorer implements Drawing {
 	
 	private Color colorFill(int k, boolean enabled) {
 		return Color.hsb(
-				hue(k),
+				hues[k],
 				0.7,
 				1.0,
 				enabled ? 1.0 : 0.0
@@ -207,25 +249,30 @@ public class RVDExplorer implements Drawing {
 	RVDColor[] colorsDiagram = new RVDColor[maxN];
 	{
 		for (int k = 0; k < maxN; k++) {
-			colorsDiagram[k]= new RVDColor(Color.hsb(hue(k), 0.6, 1.0));
+			colorsDiagram[k]= new RVDColor(Color.hsb(hues[k], 0.6, 1.0));
 		}
 	}
 	
 	
-	private RVDColor colorDiagram(IndexAngle ia) {
-		if (ia.i == -1) return RVDColor.GRAY;
-		double b = showShading ? 0.9 - 0.6 * ia.a : 0.9;
+	private RVDColor colorDiagram(PointResult ia) {
+		if (ia.i == -1) return RVDColor.BLACK;
+		if (ia.i == -2) return rvdColorBackground;
+		if (ia.i == -3) return rvdColorBackground;
+		double b = showShading ? 0.9 - 0.6 * ia.a : 1.0;
+		if (visibilityCellsShadingCount) b *= (double) ia.nVisible / n;
 		return showColor ? colorsDiagram[ia.i].mul(b) : new RVDColor(b);
 	}
 	
 	
 	private boolean visibleThroughThePolygon(Vector p, int k) {
-		LineSegment ab = LineSegment.pq(p, points[k]);
+		LineSegment ab = LineSegment.pq(points[k], p);
 		
 		if (!showPolygonExterior) {
-			if (ab.d().angleBetween(polygon.e(k-1).d(), polygon.e(k).d().inverse())) {
+			if (ab.d().angleBetween(polygon.e(k-1).d().inverse(), polygon.e(k).d())) {
 				return false;
 			}
+//			if (polygon.e(k-1).distance(p) < 0.1) return false;
+//			if (polygon.e(k  ).distance(p) < 0.1) return false;
 		}
 		
 		for (int i = 0; i < n; i++) {
@@ -233,7 +280,7 @@ public class RVDExplorer implements Drawing {
 				continue;
 			}
 			LineSegment edge = LineSegment.pq(points[i], points[(i + 1) % n]);
-			
+						
 			if (Geometry.intersecting(ab, edge)) {
 				return false;
 			}
@@ -253,14 +300,36 @@ public class RVDExplorer implements Drawing {
 	}
 	
 	
-	private record IndexAngle (int i, double a) {
+	private record PointResult(int i, int nVisible, double a) {
+		// i = -1    In the domain, but on the skeleton
+		// i = -2    In the domain, but inside the aperture
+		// i = -3    Out of the domain
 	}
 	
 	//	final Vector almostFullTurn = Vector.polar(Math.nextDown(1.0));
 	final Vector almostFullTurn = Vector.xy(Double.MAX_VALUE, -Double.MIN_VALUE);
 	
-	private IndexAngle findNearest(Vector p, Ray[] rays) {
-		int bestK = -1;
+	private static final double rEdge = 1.6;
+	private static final int nEdgeSamples = 6;
+	
+	private PointResult findNearest(Vector p, Ray[] rays) {
+		PointResult iaCenter = findNearest_(p, rays);
+		
+		if (showDiagramSkeleton) {
+			for (int k = 0; k < nEdgeSamples; k++) {
+				Vector q = Vector.polar(rEdge, (double) k / nEdgeSamples).add(p);
+				PointResult iaEdge = findNearest_(q, rays);
+				if (iaEdge.i != iaCenter.i) {
+					return new PointResult(-1, iaCenter.nVisible, iaCenter.a);
+				}
+			}
+		}
+		
+		return iaCenter;
+	}
+	
+	private PointResult findNearest_(Vector p, Ray[] rays) {
+		int bestK = -3;
 		Vector bestR = almostFullTurn;
 		
 		int[] vis = visibleVertices(p);
@@ -282,7 +351,7 @@ public class RVDExplorer implements Drawing {
 						bestK = k;
 					}
 				}
-				if (diagram == DiagramType.RVD_BIDIRECTIONAL_RAYS) {
+				if (diagram == DiagramType.RVD_RAYS_UNORIENTED) {
 					Vector r2 = Vector.xy(r.x(), -r.y());
 					if (r2.angleBefore(bestR)) {
 						bestR = r2;
@@ -292,17 +361,18 @@ public class RVDExplorer implements Drawing {
 			}
 		}
 		
-		if (polygonMode) {
-			double s = 1.0;
-			if (visibilityCellsShadingCount  ) { s *= 1.0 * vis.length / n; }
-			return new IndexAngle(bestK, 1 - s);
-		} else {
-			return new IndexAngle(bestK, ApproximateNumeric.angle(bestR));
+		double angle = ApproximateNumeric.angle(bestR);
+		if (bestK >= 0) {
+			if (angle > stopAngle1 * stopAngle2) {
+				bestK = -2;
+			}
 		}
+		
+		return new PointResult(bestK, vis.length, angle);
 	}
 	
 	
-	private IndexAngle findDDCell(Vector p, Figure[][] dominances) {
+	private PointResult findDDCell(Vector p, Figure[][] dominances) {
 		int k = 0;
 		while (!enabled[k]) {
 			k++;
@@ -310,14 +380,14 @@ public class RVDExplorer implements Drawing {
 		int i = k + 1;
 		
 		while ((k < n) && (i < k + n)) {
-			final int j = i%n;
+			final int j = i % n;
 			if (enabled[j] && dominances[j][k].contains(p)) {
 				k = i;
 			}
 			i++;
 		}
 		
-		return new IndexAngle(k < n ? k : -1, 0);
+		return new PointResult(k < n ? k : -1, 0, 0.0);
 //		return new IndexAngle(dominances[0][1].contains(p) ? 0 : -1, 0);
 	}
 	
@@ -356,12 +426,16 @@ public class RVDExplorer implements Drawing {
 */
 	
 	
+	final Vector[] pBrocard = { null }; // terribly hacky and not thread-safe due to lack of time
+	final double[] aBrocard = { 0.0 };  // same
+	
 	private static final int nBits = 3;
 	private static final int nValues = 1 << nBits;
 	
 	int[] pixels;
 	int sizeYp = 0, sizeXp = 0;
 	byte[][] bestI;
+	byte[][] bestDepth;
 	float[][] bestA;
 	
 	/**
@@ -403,9 +477,13 @@ public class RVDExplorer implements Drawing {
 			sizeYp = sizeY;
 			sizeXp = sizeX;
 			bestI = new byte[sizeY][sizeX];
-			bestA = new float[sizeY][sizeX];
+			bestDepth = new byte[sizeY][sizeX];
+			bestA = new float[sizeY][sizeX];			
 			pixels = new int[sizeY * sizeX];
 		}
+		
+		aBrocard[0] = 0.0;
+		pBrocard[0] = null;
 		
 		
 		// Finding nearest
@@ -414,9 +492,14 @@ public class RVDExplorer implements Drawing {
 			for (int x = 0; x < sizeX; x++) {
 				Vector cPixel = Vector.xy(x + 0.5, y + 0.5);
 				Vector p = tFromPixels.applyTo(cPixel);
-				IndexAngle rp = (diagram == DiagramType.DISK_DIAGRAM) ? findDDCell(p, dominanceRegion) : findNearest(p, rays);
-				bestI[y][x] = (byte) rp.i;
-				bestA[y][x] = (float) rp.a;
+				PointResult ia = (diagram == DiagramType.DISK_DIAGRAM) ? findDDCell(p, dominanceRegion) : findNearest(p, rays);
+				bestI[y][x] = (byte) ia.i;
+				bestDepth[y][x] = (byte) ia.nVisible;
+				bestA[y][x] = (float) ia.a;
+				if (ia.i >= -2 && ia.a() > aBrocard[0]) {
+					aBrocard[0] = ia.a();
+					pBrocard[0] = p;
+				}
 			}
 		});
 		
@@ -435,7 +518,9 @@ public class RVDExplorer implements Drawing {
 				
 				RVDColor color;
 				
-				if (shouldAntialias) {
+				if (!shouldAntialias) {
+					color = colorDiagram(new PointResult(bI, bestDepth[y][x], bestA[y][x]));
+				} else {
 					RVDColor sum = new RVDColor();
 					
 					for (int idx = 0; idx < nValues; idx++) {
@@ -443,14 +528,17 @@ public class RVDExplorer implements Drawing {
 						
 						Vector cPixel = Vector.xy(x + (idx + 0.5) / nValues, y + (idy + 0.5) / nValues);
 						Vector p = tFromPixels.applyTo(cPixel);
-						IndexAngle best = diagram == DiagramType.DISK_DIAGRAM ? findDDCell(p, dominanceRegion) : findNearest(p, rays);
+						PointResult ia = diagram == DiagramType.DISK_DIAGRAM ? findDDCell(p, dominanceRegion) : findNearest(p, rays);
 						
-						sum = sum.add(colorDiagram(best));
+						sum = sum.add(colorDiagram(ia));
+						
+						if (ia.i >= -2 && ia.a() > aBrocard[0]) {
+							aBrocard[0] = ia.a();
+							pBrocard[0] = p;
+						}
 					}
 					
 					color = sum.mul(1.0 / nValues);
-				} else {
-					color = colorDiagram(new IndexAngle(bI, bestA[y][x]));
 				}
 				
 				pixels[y * sizeX + x] = color.code();
@@ -505,20 +593,43 @@ public class RVDExplorer implements Drawing {
 		
 		for (int k = 0; k < n; k++) {
 			Ray ray = Ray.pd(points[k], Vector.polar(angles[k] + rotate));
-			view.setStroke(colorStroke(k, enabled[k], k == kSelected));
+			view.setStroke(colorStrokeRay(k, enabled[k], k == kSelected));
 			view.strokeRay(ray);
 		}
 	}
 	
+	
+	private void drawBrocardPoint(View view) {
+		if (pBrocard[0] == null) {
+			return;
+		}
+/*
+		System.out.println("RVDExplorer.drawBrocardPoint:581 " + pBrocard[0]);
+		Ray[] rays = new Ray[n];
+		for (int i = 0; i < n; i++) {
+			rays[i] = Ray.pa(points[i], angles[i] + rotate);
+		}
+		findNearest(pBrocard[0], rays);
+*/
+		
+//		view.setLineWidth(strokeWidth * pixelWidth);
+		
+		view.setFill(Color.WHITE);
+		view.fillCircleCentered(pBrocard[0], rPoint * pixelWidth);
+	}
 
 	private void drawPolygon(View view) {
+		if (showDiagramSkeleton) return;
 		view.setLineWidth(strokeWidth * pixelWidth);
 		view.setStroke(Color.BLACK);
+		view.setLineJoin(StrokeLineJoin.ROUND);
 		view.strokePolygon(polygon);
 	}
 	
 	
 	private void drawVisibilityCells(View view) {
+		if (!polygonMode) return;
+		
 		view.setLineWidth(strokeWidth * pixelWidth / 2);
 		view.setStroke(Color.gray(0, 0.5));
 		
@@ -597,7 +708,7 @@ public class RVDExplorer implements Drawing {
 			if (enabled[kSelected]) {
 				for (int i = 0; i < n; i++) {
 					if (i != kSelected && enabled[i]) {
-						view.setStroke(colorStroke(i, true, false));
+						view.setStroke(colorStrokeRay(i, true, false));
 						stroke(view, dominanceFor(i, kSelected));
 					}
 				}
@@ -614,25 +725,27 @@ public class RVDExplorer implements Drawing {
 				"    n               - The number of rays",
 				"",
 				"Controls:",
-				"    Mouse left      - Select a ray; Move the initial point of the selected ray",
-				"    Mouse right     - Set the angle of the selected ray",
-				"    E               - Toggle if the ray originating near the pointer is enabled",
-				"    Y               - Toggle polygon mode",
-				"    F2              - Show RVD for rays",
+				"    h               - Toggle show help",
+				"    e               - Toggle if the ray originating near the pointer is enabled",
+				"    F2              - Show RVD for oriented rays",
+				"    F5              - Show RVD for unoriented rays",
 				"    F3              - Show RVD for lines",
 				"    F4              - Show Disk Diagram",
-				"    F5              - Show RVD for rays (bidirectional)",
+				"    y               - Toggle polygon mode",
+				"    d               - Toggle show diagram",
+				"    k               - Toggle show diagram skeleton",
+				"    b               - Toggle show points of the maximum angle",
+				"    s               - Toggle show distance shading",
+				"    l               - Toggle color regions",
+				"    p               - Toggle show sites",
+				"    r               - Toggle show rays",
+				"    c               - Toggle show circles",
+				"    x               - Toggle show polygon exterior",
+				"    v               - Toggle show visibility cells",
 				"    F8              - Toggle grid",
-				"    G               - Toggle snap to grid",
-				"    D               - Toggle show diagram",
-				"    C               - Toggle show circles",
-				"    R               - Toggle show rays",
-				"    P               - Toggle show points",
-				"    V               - Toggle show visibility cells",
-				"    X               - Toggle show polygon exterior",
-				"    S               - Toggle shading",
-				"    L               - Toggle color",
-				"    H               - Toggle show help",
+				"    g               - Toggle snap to grid",
+				"    Mouse left      - Select a ray; Move the initial point of the selected ray",
+				"    Mouse right     - Set the angle of the selected ray",
 				"    Ctrl            - Control the view:",
 				"      + Mouse left      - Pan",
 				"      + Mouse wheel     - Zoom",
@@ -671,10 +784,12 @@ public class RVDExplorer implements Drawing {
 		}
 		
 		pixelWidth = 1.0 / view.transformation().getScale();
+		rvdColorBackground = new RVDColor(colorBackground);
 		
 		DrawingUtils.clear(view, Color.gray(0.9));
 		
 		if (showDiagram        ) drawDiagram(view, diagramChanged);
+		if (showBrocardPoint   ) drawBrocardPoint(view);
 		if (polygonMode        ) drawPolygon(view);
 		if (showVisibilityCells) drawVisibilityCells(view);
 		if (showCircles        ) drawCircles(view);
@@ -764,10 +879,20 @@ public class RVDExplorer implements Drawing {
 			}
 		}
 		
+		if (event.isKeyPress(KeyCode.N)) {
+			for (int i = 0; i < n; i++) {
+				points[i] = Vector.polar(i % 2 == 0 ? 350 : 150, 1.0 * i / n);
+			}
+			diagramChanged = true;
+		}
+		
+		
 		if (event.isKeyPress(KeyCode.G))   snapToGrid               ^= true;
 		if (event.isKeyPress(KeyCode.C))   showCircles              ^= true;
 		if (event.isKeyPress(KeyCode.R))   showRays                 ^= true;
 		if (event.isKeyPress(KeyCode.P))   showPoints               ^= true;
+		if (event.isKeyPress(KeyCode.K))   showDiagramSkeleton      ^= true;
+		if (event.isKeyPress(KeyCode.B))   showBrocardPoint         ^= true;
 		if (event.isKeyPress(KeyCode.V))   showVisibilityCells      ^= true;
 		if (event.isKeyPress(KeyCode.H))   showHelp                 ^= true;
 		if (event.isKeyPress(KeyCode.D)) { showDiagram              ^= true; diagramChanged |= showDiagram; }
@@ -776,9 +901,9 @@ public class RVDExplorer implements Drawing {
 		if (event.isKeyPress(KeyCode.Y)) { polygonMode              ^= true; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.X)) { showPolygonExterior      ^= true; diagramChanged = true; }
 		
-		if (event.isKeyPress(KeyCode.F2)) { diagram = DiagramType.RVD_RAYS               ; diagramChanged = true; }
+		if (event.isKeyPress(KeyCode.F2)) { diagram = DiagramType.RVD_RAYS_ORIENTED; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.F3)) { diagram = DiagramType.RVD_LINES              ; diagramChanged = true; }
-		if (event.isKeyPress(KeyCode.F4)) { diagram = DiagramType.RVD_BIDIRECTIONAL_RAYS ; diagramChanged = true; }
+		if (event.isKeyPress(KeyCode.F4)) { diagram = DiagramType.RVD_RAYS_UNORIENTED; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.F5)) { diagram = DiagramType.DISK_DIAGRAM           ; diagramChanged = true; }
 	}
 	
@@ -787,6 +912,13 @@ public class RVDExplorer implements Drawing {
 	
 	public static void main(String[] args) {
 		Options options = new Options();
+/*
+		options.redrawOnPulse = false;
+		options.redrawOnInput = true;
+		options.redrawOnGadgetValueChange = true;
+		options.redrawOnResize = true;
+		options.redrawOnOSDChange = true;
+*/
 		options.windowTitle = "RVD Explorer";
 		options.drawingSize = RVDExplorer.sizeInitial;
 		options.gridSubdivision = 8;

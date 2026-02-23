@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.Base64;
+import java.util.random.RandomGenerator;
 import java.util.stream.IntStream;
 
 import javafx.scene.image.Image;
@@ -25,8 +26,8 @@ import xyz.marsavic.geometry.Box;
 import xyz.marsavic.geometry.Vector;
 import xyz.marsavic.input.InputEvent;
 import xyz.marsavic.input.InputState;
-import xyz.marsavic.random.RNG;
 import xyz.marsavic.random.sampling.Sampler;
+import xyz.marsavic.utils.Hash;
 import xyz.marsavic.utils.Numeric;
 
 
@@ -66,8 +67,8 @@ public class RotationalDiagram implements Drawing {
 	
 	int kSelected = -1;
 
-	RNG rng = new RNG();
-	Sampler sampler = new Sampler(rng);
+	Sampler sampler = new Sampler(new Hash(0xC68D25EBD134C8EDL));
+	RandomGenerator rng = new Hash(0xF263ED177AFEF8A2L).rng();
 
 	
 	

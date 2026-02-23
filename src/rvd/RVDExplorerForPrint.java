@@ -36,6 +36,7 @@ import xyz.marsavic.input.InputEvent;
 import xyz.marsavic.input.InputState;
 import xyz.marsavic.input.KeyCode;
 import xyz.marsavic.random.sampling.Sampler;
+import xyz.marsavic.utils.Hash;
 import xyz.marsavic.utils.Numeric;
 import xyz.marsavic.utils.performance.ApproximateNumeric;
 
@@ -69,7 +70,7 @@ public class RVDExplorerForPrint implements Drawing {
 	boolean polygon = false;
 	boolean leftSideOnly = false;
 	
-	DiagramType diagram = DiagramType.RVD_RAYS;
+	DiagramType diagram = DiagramType.RVD_RAYS_ORIENTED;
 	
 	
 	@GadgetAnimation(p = 0, q = 1, loop = true, speed = 0.05, start = false)
@@ -133,13 +134,13 @@ public class RVDExplorerForPrint implements Drawing {
 	
 	
 	{
-		Sampler sampler = new Sampler();
+		Sampler sampler = new Sampler(new Hash(0x5C727CC650E510C7L));
 		
 		Box box = Box.cr(sizeInitial.div(2));
 		for (int k = 0; k < maxN; k++) {
 			points[k] = sampler.randomInBox(box.scaleFromCenter(2.0/3));
 //			points[k] = sampler.randomGaussian(box.r().min() / 2);
-			angles[k] = sampler.rng().nextDouble();
+			angles[k] = sampler.uniform();
 			enabled[k] = true;
 		}
 	}
@@ -220,7 +221,7 @@ public class RVDExplorerForPrint implements Drawing {
 						bestK = k;
 					}
 				}
-				if (diagram == DiagramType.RVD_BIDIRECTIONAL_RAYS) {
+				if (diagram == DiagramType.RVD_RAYS_UNORIENTED) {
 					Vector r2 = Vector.xy(r.x(), -r.y());
 					if (r2.angleBefore(bestR)) {
 						bestR = r2;
@@ -648,10 +649,10 @@ public class RVDExplorerForPrint implements Drawing {
 		if (event.isKeyPress(KeyCode.Y)) { polygon                  ^= true; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.M)) { leftSideOnly             ^= true; diagramChanged = true; }
 		
-		if (event.isKeyPress(KeyCode.F2)) { diagram = DiagramType.RVD_RAYS               ; diagramChanged = true; }
+		if (event.isKeyPress(KeyCode.F2)) { diagram = DiagramType.RVD_RAYS_ORIENTED; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.F3)) { diagram = DiagramType.RVD_LINES              ; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.F4)) { diagram = DiagramType.DISK_DIAGRAM; diagramChanged = true; }
-		if (event.isKeyPress(KeyCode.F5)) { diagram = DiagramType.RVD_BIDIRECTIONAL_RAYS ; diagramChanged = true; }
+		if (event.isKeyPress(KeyCode.F5)) { diagram = DiagramType.RVD_RAYS_UNORIENTED; diagramChanged = true; }
 	}
 	
 	
