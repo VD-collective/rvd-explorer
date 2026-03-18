@@ -7,6 +7,7 @@ import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineJoin;
 import rvd.core.DominanceRegionFactory;
+import rvd.core.DiskCellSelector;
 import rvd.io.ExplorerDataCodec;
 import rvd.model.ExplorerSnapshot;
 import rvd.model.ExplorerState;
@@ -140,6 +141,7 @@ public class RVDExplorer implements Drawing {
 	RVDColor rvdColorBackground;
 	private final ExplorerDataCodec dataCodec = new ExplorerDataCodec();
 	private final DominanceRegionFactory dominanceRegionFactory = new DominanceRegionFactory();
+	private final DiskCellSelector diskCellSelector = new DiskCellSelector();
 	
 	
 	CameraSimple camera = new CameraSimple(F_R_R.cutoff01(t -> F_R_R.power(t, 8)));
@@ -340,21 +342,8 @@ public class RVDExplorer implements Drawing {
 	
 	
 	private PointResult findDDCell(Vector p, Figure[][] dominances) {
-		int k = 0;
-		while (!state.enabled[k]) {
-			k++;
-		}
-		int i = k + 1;
-		
-		while ((k < state.n) && (i < k + state.n)) {
-			final int j = i % state.n;
-			if (state.enabled[j] && dominances[j][k].contains(p)) {
-				k = i;
-			}
-			i++;
-		}
-		
-		return new PointResult(k < state.n ? k : -1, 0, 0.0);
+		int k = diskCellSelector.select(p, dominances, state.enabled, state.n);
+		return new PointResult(k, 0, 0.0);
 //		return new IndexAngle(dominances[0][1].contains(p) ? 0 : -1, 0);
 	}
 	
