@@ -9,6 +9,7 @@ import javafx.scene.shape.StrokeLineJoin;
 import rvd.core.DominanceRegionFactory;
 import rvd.core.DiskCellSelector;
 import rvd.core.PolygonVisibility;
+import rvd.core.RayNearestSelector;
 import rvd.io.ExplorerDataCodec;
 import rvd.model.ExplorerSnapshot;
 import rvd.model.ExplorerState;
@@ -27,8 +28,6 @@ import xyz.marsavic.input.KeyCode;
 import xyz.marsavic.random.sampling.Sampler;
 import xyz.marsavic.utils.Hash;
 import xyz.marsavic.utils.Numeric;
-import xyz.marsavic.utils.performance.ApproximateNumeric;
-import xyz.marsavic.utils.performance.ArrayInts;
 
 import java.nio.IntBuffer;
 import java.util.stream.IntStream;
@@ -144,6 +143,7 @@ public class RVDExplorer implements Drawing {
 	private final DominanceRegionFactory dominanceRegionFactory = new DominanceRegionFactory();
 	private final DiskCellSelector diskCellSelector = new DiskCellSelector();
 	private final PolygonVisibility polygonVisibility = new PolygonVisibility();
+	private final RayNearestSelector rayNearestSelector = new RayNearestSelector();
 
 
 	CameraSimple camera = new CameraSimple(F_R_R.cutoff01(t -> F_R_R.power(t, 8)));
@@ -240,9 +240,6 @@ public class RVDExplorer implements Drawing {
 		// i = -3    Out of the domain
 	}
 
-	//	final Vector almostFullTurn = Vector.polar(Math.nextDown(1.0));
-	final Vector almostFullTurn = Vector.xy(Double.MAX_VALUE, -Double.MIN_VALUE);
-
 	private static final double rEdge = 1.6;
 	private static final int nEdgeSamples = 6;
 
@@ -263,9 +260,6 @@ public class RVDExplorer implements Drawing {
 	}
 
 	private PointResult findNearest_(Vector p, Ray[] rays) {
-		int bestK = -3;
-		Vector bestR = almostFullTurn;
-
 		int[] vis = polygonVisibility.visibleVertices(
 				p,
 				state.points,
@@ -275,34 +269,16 @@ public class RVDExplorer implements Drawing {
 				showPolygonExterior
 		);
 
-		for (int k : vis) {
-			if (state.enabled[k]) {
-				Vector o = p.sub(rays[k].p());
-				Vector e = rays[k].d();
-				Vector r = Vector.xy(e.dot(o), e.cross(o));
-
-				if (r.angleBefore(bestR)) {
-					bestR = r;
-					bestK = k;
-				}
-				if (diagram == DiagramType.RVD_LINES) {
-					r = r.inverse();
-					if (r.angleBefore(bestR)) {
-						bestR = r;
-						bestK = k;
-					}
-				}
-				if (diagram == DiagramType.RVD_RAYS_UNORIENTED) {
-					Vector r2 = Vector.xy(r.x(), -r.y());
-					if (r2.angleBefore(bestR)) {
-						bestR = r2;
-						bestK = k;
-					}
-				}
-			}
-		}
-
-		double angle = ApproximateNumeric.angle(bestR);
+		RayNearestSelector.Result nearest = rayNearestSelector.select(
+				p,
+				rays,
+				state.enabled,
+				vis,
+				diagram == DiagramType.RVD_LINES,
+				diagram == DiagramType.RVD_RAYS_UNORIENTED
+		);
+		int bestK = nearest.bestIndex();
+		double angle = nearest.angle();
 		if (bestK >= 0) {
 			if (angle > stopAngle1 * stopAngle2) {
 				bestK = -2;
