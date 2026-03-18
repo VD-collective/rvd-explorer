@@ -338,33 +338,7 @@ public class RVDExplorer implements Drawing {
 	byte[][] bestDepth;
 	float[][] bestA;
 
-	/**
-	 * @param tFromPixels  A transformation from the pixel space to the working space
-	 * @param bImage  An integer box in the pixel space used to make the resulting image
-	 * @return ...
-	 */
-	private Image makeImage(Transformation tFromPixels, Box bImage) {
-		Vector diag = bImage.d().abs();
-		int sizeX = diag.xInt();
-		int sizeY = diag.yInt();
-
-		if (sizeX == 0 || sizeY == 0) {
-			return null;
-		}
-
-		DiagramPreparation.PreparedData prepared = diagramPreparation.prepare(
-				state.points,
-				state.angles,
-				state.n,
-				state.rotate,
-				polygonMode,
-				this::dominanceFor
-		);
-		polygon = prepared.polygon();
-		Ray[] rays = prepared.rays();
-		Figure[][] dominanceRegion = prepared.dominanceRegion();
-
-
+	private void ensureBuffers(int sizeX, int sizeY) {
 		if ((sizeYp < sizeY) || (sizeXp < sizeX)) {
 			sizeYp = sizeY;
 			sizeXp = sizeX;
@@ -373,31 +347,53 @@ public class RVDExplorer implements Drawing {
 			bestA = new float[sizeY][sizeX];
 			pixels = new int[sizeY * sizeX];
 		}
+	}
 
+	private void resetBrocardSearch() {
 		aBrocard[0] = 0.0;
 		pBrocard[0] = null;
+	}
 
+	private PointResult classifyPoint(Vector p, Figure[][] dominanceRegion, Ray[] rays) {
+		return (diagram == DiagramType.DISK_DIAGRAM)
+				? findDDCell(p, dominanceRegion)
+				: findNearest(p, rays);
+	}
 
-		// Finding nearest
+	private void updateBrocardIfBetter(PointResult ia, Vector p) {
+		if (ia.i >= -2 && ia.a() > aBrocard[0]) {
+			aBrocard[0] = ia.a();
+			pBrocard[0] = p;
+		}
+	}
 
+	private void computeNearestPass(
+			Transformation tFromPixels,
+			int sizeX,
+			int sizeY,
+			Figure[][] dominanceRegion,
+			Ray[] rays
+	) {
 		IntStream.range(0, sizeY).parallel().forEach(y -> {
 			for (int x = 0; x < sizeX; x++) {
 				Vector cPixel = Vector.xy(x + 0.5, y + 0.5);
 				Vector p = tFromPixels.applyTo(cPixel);
-				PointResult ia = (diagram == DiagramType.DISK_DIAGRAM) ? findDDCell(p, dominanceRegion) : findNearest(p, rays);
+				PointResult ia = classifyPoint(p, dominanceRegion, rays);
 				bestI[y][x] = (byte) ia.i;
 				bestDepth[y][x] = (byte) ia.nVisible;
 				bestA[y][x] = (float) ia.a;
-				if (ia.i >= -2 && ia.a() > aBrocard[0]) {
-					aBrocard[0] = ia.a();
-					pBrocard[0] = p;
-				}
+				updateBrocardIfBetter(ia, p);
 			}
 		});
+	}
 
-
-		// Antialiasing
-
+	private void computeAntialiasPass(
+			Transformation tFromPixels,
+			int sizeX,
+			int sizeY,
+			Figure[][] dominanceRegion,
+			Ray[] rays
+	) {
 		IntStream.range(0, sizeY).parallel().forEach(y -> {
 			for (int x = 0; x < sizeX; x++) {
 				int bI = bestI[y][x];
@@ -420,14 +416,11 @@ public class RVDExplorer implements Drawing {
 
 						Vector cPixel = Vector.xy(x + (idx + 0.5) / nValues, y + (idy + 0.5) / nValues);
 						Vector p = tFromPixels.applyTo(cPixel);
-						PointResult ia = diagram == DiagramType.DISK_DIAGRAM ? findDDCell(p, dominanceRegion) : findNearest(p, rays);
+						PointResult ia = classifyPoint(p, dominanceRegion, rays);
 
 						sum = sum.add(colorDiagram(ia));
 
-						if (ia.i >= -2 && ia.a() > aBrocard[0]) {
-							aBrocard[0] = ia.a();
-							pBrocard[0] = p;
-						}
+						updateBrocardIfBetter(ia, p);
 					}
 
 					color = sum.mul(1.0 / nValues);
@@ -436,15 +429,59 @@ public class RVDExplorer implements Drawing {
 				pixels[y * sizeX + x] = color.code();
 			}
 		});
+	}
 
+	private boolean isEmptyImage(int sizeX, int sizeY) {
+		return sizeX == 0 || sizeY == 0;
+	}
 
+	private Image buildWritableImage(int sizeX, int sizeY) {
 		PixelFormat<IntBuffer> pixelFormat = PixelFormat.getIntArgbPreInstance();
 		IntBuffer buffer = IntBuffer.wrap(pixels);
-
 		PixelBuffer<IntBuffer> pixelBuffer = new PixelBuffer<>(sizeX, sizeY, buffer, pixelFormat);
 		pixelBuffer.updateBuffer(pb -> null);
-
 		return new WritableImage(pixelBuffer);
+	}
+
+	/**
+	 * @param tFromPixels  A transformation from the pixel space to the working space
+	 * @param bImage  An integer box in the pixel space used to make the resulting image
+	 * @return ...
+	 */
+	private Image makeImage(Transformation tFromPixels, Box bImage) {
+		Vector diag = bImage.d().abs();
+		int sizeX = diag.xInt();
+		int sizeY = diag.yInt();
+
+		if (isEmptyImage(sizeX, sizeY)) {
+			return null;
+		}
+
+		DiagramPreparation.PreparedData prepared = diagramPreparation.prepare(
+				state.points,
+				state.angles,
+				state.n,
+				state.rotate,
+				polygonMode,
+				this::dominanceFor
+		);
+		polygon = prepared.polygon();
+		Ray[] rays = prepared.rays();
+		Figure[][] dominanceRegion = prepared.dominanceRegion();
+
+		ensureBuffers(sizeX, sizeY);
+
+		resetBrocardSearch();
+
+
+		// Finding nearest
+		computeNearestPass(tFromPixels, sizeX, sizeY, dominanceRegion, rays);
+
+		// Antialiasing
+		computeAntialiasPass(tFromPixels, sizeX, sizeY, dominanceRegion, rays);
+
+
+		return buildWritableImage(sizeX, sizeY);
 	}
 
 
@@ -655,6 +692,22 @@ public class RVDExplorer implements Drawing {
 
 	boolean diagramChanged = true;
 
+	private void updateDrawInvalidationState(View view) {
+		if (!dataString.equals(lastDataString)) {
+			stringToData(dataString);
+		} else {
+			diagramChanged |= !lastNativeBox.equals(view.nativeBox());
+			diagramChanged |= !lastTransformation.equals(view.transformation());
+		}
+	}
+
+	private void syncFrameState(View view) {
+		lastDataString = dataString = dataAsString();
+		lastNativeBox = view.nativeBox();
+		lastTransformation = view.transformation();
+		diagramChanged = false;
+	}
+
 
 	@Override
 	public void valuesChanged() {
@@ -668,12 +721,7 @@ public class RVDExplorer implements Drawing {
 	public void draw(View view) {
 		view.addTransformation(camera.getTransformation());
 
-		if (!dataString.equals(lastDataString)) {
-			stringToData(dataString);
-		} else {
-			diagramChanged |= !lastNativeBox.equals(view.nativeBox());
-			diagramChanged |= !lastTransformation.equals(view.transformation());
-		}
+		updateDrawInvalidationState(view);
 
 		pixelWidth = 1.0 / view.transformation().getScale();
 		rvdColorBackground = new RVDColor(colorBackground);
@@ -689,10 +737,7 @@ public class RVDExplorer implements Drawing {
 		if (showPoints         ) drawPoints(view);
 		if (showHelp           ) showHelp(view);
 
-		lastDataString = dataString = dataAsString();
-		lastNativeBox = view.nativeBox();
-		lastTransformation = view.transformation();
-		diagramChanged = false;
+		syncFrameState(view);
 	}
 
 
