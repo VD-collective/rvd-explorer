@@ -6,6 +6,8 @@ import javafx.scene.image.PixelFormat;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineJoin;
+import rvd.io.ExplorerDataCodec;
+import rvd.model.ExplorerSnapshot;
 import xyz.marsavic.drawingfx.application.DrawingApplication;
 import xyz.marsavic.drawingfx.application.Options;
 import xyz.marsavic.drawingfx.drawing.Drawing;
@@ -24,12 +26,7 @@ import xyz.marsavic.utils.Numeric;
 import xyz.marsavic.utils.performance.ApproximateNumeric;
 import xyz.marsavic.utils.performance.ArrayInts;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.nio.IntBuffer;
-import java.util.Base64;
 import java.util.stream.IntStream;
 
 
@@ -148,6 +145,7 @@ public class RVDExplorer implements Drawing {
 	private Polygon polygon;
 
 	RVDColor rvdColorBackground;
+	private final ExplorerDataCodec dataCodec = new ExplorerDataCodec();
 	
 	
 	CameraSimple camera = new CameraSimple(F_R_R.cutoff01(t -> F_R_R.power(t, 8)));
@@ -156,43 +154,39 @@ public class RVDExplorer implements Drawing {
 	
 	
 	private String dataAsString() {
-		try (
-				ByteArrayOutputStream outB = new ByteArrayOutputStream();
-				ObjectOutputStream out = new ObjectOutputStream(outB)
-		) {
-			out.writeDouble(rotate);
-			out.writeInt(n);
-			for (int k = 0; k < n; k++) {
-				out.writeDouble(points[k].x());
-				out.writeDouble(points[k].y());
-				out.writeDouble(angles[k]);
-				out.writeBoolean(enabled[k]);
-			}
-			out.flush();
-			
-			return Base64.getEncoder().encodeToString(outB.toByteArray());
-		} catch (Exception e) {
-			return null;
-		}
+		return dataCodec.encode(snapshot());
 	}
 	
 	
 	private void stringToData(String data) {
-		try (
-				ByteArrayInputStream inB = new ByteArrayInputStream(Base64.getDecoder().decode(data));
-				ObjectInputStream in = new ObjectInputStream(inB)
-		) {
-			rotate = in.readDouble();
-			n      = in.readInt();
-			for (int k = 0; k < n; k++) {
-				double x = in.readDouble();
-				double y = in.readDouble();
-				points[k] = Vector.xy(x, y);
-				angles[k] = in.readDouble();
-				enabled[k] = in.readBoolean();
-			}
-		} catch (Exception e) {
-			// I should really do nothing here.
+		ExplorerSnapshot snapshot = dataCodec.decode(data);
+		if (snapshot != null) {
+			applySnapshot(snapshot);
+		}
+	}
+
+	private ExplorerSnapshot snapshot() {
+		Vector[] snapshotPoints = new Vector[n];
+		double[] snapshotAngles = new double[n];
+		boolean[] snapshotEnabled = new boolean[n];
+		for (int k = 0; k < n; k++) {
+			snapshotPoints[k] = points[k];
+			snapshotAngles[k] = angles[k];
+			snapshotEnabled[k] = enabled[k];
+		}
+		return new ExplorerSnapshot(rotate, n, snapshotPoints, snapshotAngles, snapshotEnabled);
+	}
+
+	private void applySnapshot(ExplorerSnapshot snapshot) {
+		rotate = snapshot.rotate();
+		n = snapshot.n();
+		Vector[] snapshotPoints = snapshot.points();
+		double[] snapshotAngles = snapshot.angles();
+		boolean[] snapshotEnabled = snapshot.enabled();
+		for (int k = 0; k < n; k++) {
+			points[k] = snapshotPoints[k];
+			angles[k] = snapshotAngles[k];
+			enabled[k] = snapshotEnabled[k];
 		}
 	}
 	
