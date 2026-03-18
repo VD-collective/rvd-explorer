@@ -6,6 +6,7 @@ import javafx.scene.image.PixelFormat;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineJoin;
+import rvd.core.DiagramPreparation;
 import rvd.core.DominanceRegionFactory;
 import rvd.core.DiskCellSelector;
 import rvd.core.PolygonVisibility;
@@ -144,6 +145,7 @@ public class RVDExplorer implements Drawing {
 	private final DiskCellSelector diskCellSelector = new DiskCellSelector();
 	private final PolygonVisibility polygonVisibility = new PolygonVisibility();
 	private final RayNearestSelector rayNearestSelector = new RayNearestSelector();
+	private final DiagramPreparation diagramPreparation = new DiagramPreparation();
 
 
 	CameraSimple camera = new CameraSimple(F_R_R.cutoff01(t -> F_R_R.power(t, 8)));
@@ -350,25 +352,17 @@ public class RVDExplorer implements Drawing {
 			return null;
 		}
 
-		if (polygonMode) {
-			for (int i = 0; i < state.n; i++) {
-				state.angles[i] = state.points[(i + 1) % state.n].sub(state.points[i]).angle();
-			}
-
-			polygon = Polygon.of(state.points, state.n);
-		}
-
-		Ray[] rays = new Ray[state.n];
-		for (int i = 0; i < state.n; i++) {
-			rays[i] = Ray.pa(state.points[i], state.angles[i] + state.rotate);
-		}
-
-		Figure[][] dominanceRegion = new Figure[state.n][state.n];
-		for (int i0 = 0; i0 < state.n; i0++) {
-			for (int i1 = 0; i1 < state.n; i1++) {
-				dominanceRegion[i0][i1] = dominanceFor(i0, i1);
-			}
-		}
+		DiagramPreparation.PreparedData prepared = diagramPreparation.prepare(
+				state.points,
+				state.angles,
+				state.n,
+				state.rotate,
+				polygonMode,
+				this::dominanceFor
+		);
+		polygon = prepared.polygon();
+		Ray[] rays = prepared.rays();
+		Figure[][] dominanceRegion = prepared.dominanceRegion();
 
 
 		if ((sizeYp < sizeY) || (sizeXp < sizeX)) {
