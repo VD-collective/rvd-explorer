@@ -9,8 +9,8 @@ import javafx.scene.shape.StrokeLineJoin;
 import rvd.core.DiagramPreparation;
 import rvd.core.DominanceRegionFactory;
 import rvd.core.DiskCellSelector;
+import rvd.core.NearestCellClassifier;
 import rvd.core.PolygonVisibility;
-import rvd.core.RayNearestSelector;
 import rvd.io.ExplorerDataCodec;
 import rvd.model.ExplorerSnapshot;
 import rvd.model.ExplorerState;
@@ -143,8 +143,8 @@ public class RVDExplorer implements Drawing {
 	private final ExplorerDataCodec dataCodec = new ExplorerDataCodec();
 	private final DominanceRegionFactory dominanceRegionFactory = new DominanceRegionFactory();
 	private final DiskCellSelector diskCellSelector = new DiskCellSelector();
+	private final NearestCellClassifier nearestCellClassifier = new NearestCellClassifier();
 	private final PolygonVisibility polygonVisibility = new PolygonVisibility();
-	private final RayNearestSelector rayNearestSelector = new RayNearestSelector();
 	private final DiagramPreparation diagramPreparation = new DiagramPreparation();
 
 
@@ -271,23 +271,17 @@ public class RVDExplorer implements Drawing {
 				showPolygonExterior
 		);
 
-		RayNearestSelector.Result nearest = rayNearestSelector.select(
+		NearestCellClassifier.Result nearest = nearestCellClassifier.classify(
 				p,
 				rays,
 				state.enabled,
 				vis,
 				diagram == DiagramType.RVD_LINES,
-				diagram == DiagramType.RVD_RAYS_UNORIENTED
+				diagram == DiagramType.RVD_RAYS_UNORIENTED,
+				stopAngle1 * stopAngle2
 		);
-		int bestK = nearest.bestIndex();
-		double angle = nearest.angle();
-		if (bestK >= 0) {
-			if (angle > stopAngle1 * stopAngle2) {
-				bestK = -2;
-			}
-		}
 
-		return new PointResult(bestK, vis.length, angle);
+		return new PointResult(nearest.index(), nearest.visibleCount(), nearest.angle());
 	}
 
 
