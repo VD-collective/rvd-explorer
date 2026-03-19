@@ -10,6 +10,7 @@ import rvd.core.PolygonVisibility;
 import rvd.io.ExplorerDataCodec;
 import rvd.model.ExplorerSnapshot;
 import rvd.model.ExplorerState;
+import rvd.render.DiagramFrameCoordinator;
 import rvd.render.OverlayDrawer;
 import rvd.render.RasterDiagramRenderer;
 import xyz.marsavic.drawingfx.application.DrawingApplication;
@@ -140,6 +141,7 @@ public class RVDExplorer implements Drawing {
 	private final NearestCellClassifier nearestCellClassifier = new NearestCellClassifier();
 	private final PolygonVisibility polygonVisibility = new PolygonVisibility();
 	private final DiagramPreparation diagramPreparation = new DiagramPreparation();
+	private final DiagramFrameCoordinator diagramFrameCoordinator = new DiagramFrameCoordinator();
 	private final OverlayDrawer overlayDrawer = new OverlayDrawer();
 	private final RasterDiagramRenderer rasterDiagramRenderer = new RasterDiagramRenderer();
 
@@ -367,23 +369,6 @@ public class RVDExplorer implements Drawing {
 //	}
 
 
-	Image imgDiagram;
-
-	// Constructs an image covering visible area and draws it.
-	private void drawDiagram(View view, boolean shouldRedraw) {
-		Box b = view.nativeBox().positive();
-		Transformation t = view.transformation();
-
-		if (shouldRedraw) {
-			imgDiagram = makeImage(t.inverse(), b);
-		}
-
-		view.setTransformation(Transformation.IDENTITY);
-		view.drawImage(b, imgDiagram);
-		view.setTransformation(t);
-	}
-
-
 	private void showHelp(View view) {
 		DrawingUtils.drawInfoText(view,
 				"Gadgets:",
@@ -424,30 +409,16 @@ public class RVDExplorer implements Drawing {
 	}
 
 
-	String lastDataString = "";
-	Box lastNativeBox = Box.ZERO;
-	Transformation lastTransformation = Transformation.IDENTITY;
-
-	boolean diagramChanged = true;
-
 	private void updateDrawInvalidationState(View view) {
-		if (!dataString.equals(lastDataString)) {
-			stringToData(dataString);
-		} else {
-			diagramChanged |= !lastNativeBox.equals(view.nativeBox());
-			diagramChanged |= !lastTransformation.equals(view.transformation());
-		}
+		diagramFrameCoordinator.updateInvalidationState(view, dataString, this::stringToData);
 	}
 
 	private void syncFrameState(View view) {
-		lastDataString = dataString = dataAsString();
-		lastNativeBox = view.nativeBox();
-		lastTransformation = view.transformation();
-		diagramChanged = false;
+		dataString = diagramFrameCoordinator.syncFrameState(view, this::dataAsString);
 	}
 
 	private void drawVisibleLayers(View view) {
-		if (showDiagram        ) drawDiagram(view, diagramChanged);
+		if (showDiagram        ) diagramFrameCoordinator.drawDiagram(view, this::makeImage);
 		if (showBrocardPoint   ) overlayDrawer.drawBrocardPoint(view, pBrocard[0], pixelWidth, rPoint);
 		if (polygonMode        ) overlayDrawer.drawPolygon(view, polygon, showDiagramSkeleton, pixelWidth, strokeWidth);
 		if (showVisibilityCells) overlayDrawer.drawVisibilityCells(view, polygon, polygonMode, state.n, pixelWidth, strokeWidth);
@@ -460,7 +431,7 @@ public class RVDExplorer implements Drawing {
 
 	@Override
 	public void valuesChanged() {
-		diagramChanged = true;
+		diagramFrameCoordinator.markDirty();
 	}
 
 
@@ -535,13 +506,13 @@ public class RVDExplorer implements Drawing {
 	private void applyPointerEdits(InputState inputState, Vector p) {
 		if (dragging && kSelected >= 0) {
 			this.state.points[kSelected] = p;
-			diagramChanged = true;
+			diagramFrameCoordinator.markDirty();
 		}
 
 		if (inputState.mouseButtonPressed(3) && kSelected >= 0) {
 			Vector d = p.sub(this.state.points[kSelected]);
 			this.state.angles[kSelected] = d.angle() - this.state.rotate;
-			diagramChanged = true;
+			diagramFrameCoordinator.markDirty();
 		}
 	}
 
@@ -550,7 +521,7 @@ public class RVDExplorer implements Drawing {
 			int k = nearestK(pointerWorld, mouseReach * pixelWidth);
 			if (k >= 0) {
 				this.state.enabled[k] ^= true;
-				diagramChanged = true;
+				diagramFrameCoordinator.markDirty();
 			}
 		}
 
@@ -558,7 +529,7 @@ public class RVDExplorer implements Drawing {
 			for (int i = 0; i < this.state.n; i++) {
 				this.state.points[i] = Vector.polar(i % 2 == 0 ? 350 : 150, 1.0 * i / this.state.n);
 			}
-			diagramChanged = true;
+			diagramFrameCoordinator.markDirty();
 		}
 	}
 
@@ -571,18 +542,18 @@ public class RVDExplorer implements Drawing {
 		if (event.isKeyPress(KeyCode.B))   showBrocardPoint         ^= true;
 		if (event.isKeyPress(KeyCode.V))   showVisibilityCells      ^= true;
 		if (event.isKeyPress(KeyCode.H))   showHelp                 ^= true;
-		if (event.isKeyPress(KeyCode.D)) { showDiagram              ^= true; diagramChanged |= showDiagram; }
-		if (event.isKeyPress(KeyCode.L)) { showColor                ^= true; diagramChanged = true; }
-		if (event.isKeyPress(KeyCode.S)) { showShading              ^= true; diagramChanged = true; }
-		if (event.isKeyPress(KeyCode.Y)) { polygonMode              ^= true; diagramChanged = true; }
-		if (event.isKeyPress(KeyCode.X)) { showPolygonExterior      ^= true; diagramChanged = true; }
+		if (event.isKeyPress(KeyCode.D)) { showDiagram              ^= true; if (showDiagram) diagramFrameCoordinator.markDirty(); }
+		if (event.isKeyPress(KeyCode.L)) { showColor                ^= true; diagramFrameCoordinator.markDirty(); }
+		if (event.isKeyPress(KeyCode.S)) { showShading              ^= true; diagramFrameCoordinator.markDirty(); }
+		if (event.isKeyPress(KeyCode.Y)) { polygonMode              ^= true; diagramFrameCoordinator.markDirty(); }
+		if (event.isKeyPress(KeyCode.X)) { showPolygonExterior      ^= true; diagramFrameCoordinator.markDirty(); }
 	}
 
 	private void applyDiagramModeKeys(InputEvent event) {
-		if (event.isKeyPress(KeyCode.F2)) { diagram = DiagramType.RVD_RAYS_ORIENTED  ; diagramChanged = true; }
-		if (event.isKeyPress(KeyCode.F3)) { diagram = DiagramType.RVD_LINES          ; diagramChanged = true; }
-		if (event.isKeyPress(KeyCode.F4)) { diagram = DiagramType.RVD_RAYS_UNORIENTED; diagramChanged = true; }
-		if (event.isKeyPress(KeyCode.F5)) { diagram = DiagramType.DISK_DIAGRAM       ; diagramChanged = true; }
+		if (event.isKeyPress(KeyCode.F2)) { diagram = DiagramType.RVD_RAYS_ORIENTED  ; diagramFrameCoordinator.markDirty(); }
+		if (event.isKeyPress(KeyCode.F3)) { diagram = DiagramType.RVD_LINES          ; diagramFrameCoordinator.markDirty(); }
+		if (event.isKeyPress(KeyCode.F4)) { diagram = DiagramType.RVD_RAYS_UNORIENTED; diagramFrameCoordinator.markDirty(); }
+		if (event.isKeyPress(KeyCode.F5)) { diagram = DiagramType.DISK_DIAGRAM       ; diagramFrameCoordinator.markDirty(); }
 	}
 
 	private void handleEditorInput(InputEvent event, InputState inputState, Vector pointerWorld) {
