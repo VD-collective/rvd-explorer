@@ -26,5 +26,9 @@ bin/
 .vscode/
 .cursor/
 
+### Gradle ###
+.gradle/
+build/
+
 ### Mac OS ###
 .DS_Store

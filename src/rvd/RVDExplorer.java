@@ -319,6 +319,13 @@ public class RVDExplorer implements Drawing {
 	 * @return ...
 	 */
 	private Image makeImage(Transformation tFromPixels, Box bImage) {
+		Vector diag = bImage.d().abs();
+		int sizeX = diag.xInt();
+		int sizeY = diag.yInt();
+		if (sizeX == 0 || sizeY == 0) {
+			return null;
+		}
+
 		DiagramPreparation.PreparedData prepared = diagramPreparation.prepare(
 				state.points,
 				state.angles,
