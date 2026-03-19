@@ -708,6 +708,17 @@ public class RVDExplorer implements Drawing {
 		diagramChanged = false;
 	}
 
+	private void drawVisibleLayers(View view) {
+		if (showDiagram        ) drawDiagram(view, diagramChanged);
+		if (showBrocardPoint   ) drawBrocardPoint(view);
+		if (polygonMode        ) drawPolygon(view);
+		if (showVisibilityCells) drawVisibilityCells(view);
+		if (showCircles        ) drawCircles(view);
+		if (showRays           ) drawRays(view);
+		if (showPoints         ) drawPoints(view);
+		if (showHelp           ) showHelp(view);
+	}
+
 
 	@Override
 	public void valuesChanged() {
@@ -727,15 +738,7 @@ public class RVDExplorer implements Drawing {
 		rvdColorBackground = new RVDColor(colorBackground);
 
 		DrawingUtils.clear(view, Color.gray(0.9));
-
-		if (showDiagram        ) drawDiagram(view, diagramChanged);
-		if (showBrocardPoint   ) drawBrocardPoint(view);
-		if (polygonMode        ) drawPolygon(view);
-		if (showVisibilityCells) drawVisibilityCells(view);
-		if (showCircles        ) drawCircles(view);
-		if (showRays           ) drawRays(view);
-		if (showPoints         ) drawPoints(view);
-		if (showHelp           ) showHelp(view);
+		drawVisibleLayers(view);
 
 		syncFrameState(view);
 	}
@@ -765,16 +768,7 @@ public class RVDExplorer implements Drawing {
 	double mouseReach = 12;
 	double draggingMinDistance = 1;
 
-
-	@Override
-	public void receiveEvent(View view, InputEvent event, InputState state, Vector pointerWorld, Vector pointerViewBase) {
-		if (state.keyPressed(KeyCode.CONTROL)) {
-			camera.receiveEvent(view, event, state, pointerWorld, pointerViewBase);
-			return;
-		}
-
-		Vector p = snapToGrid ? pointerWorld.round(gridCellD) : pointerWorld;
-
+	private void updateSelectionStart(InputEvent event, Vector pointerWorld) {
 		if (!dragging) {
 			int k = nearestK(pointerWorld, mouseReach * pixelWidth);
 			if (k >= 0) {
@@ -788,26 +782,32 @@ public class RVDExplorer implements Drawing {
 				}
 			}
 		}
+	}
 
-		if (state.mouseButtonPressed(1)) {
+	private void updateDraggingState(InputState inputState, Vector pointerWorld) {
+		if (inputState.mouseButtonPressed(1)) {
 			if (draggingStartPoint != null && pointerWorld.distanceTo(draggingStartPoint) > draggingMinDistance * pixelWidth) {
 				dragging = true;
 			}
 		} else {
 			dragging = false;
 		}
+	}
 
+	private void applyPointerEdits(InputState inputState, Vector p) {
 		if (dragging && kSelected >= 0) {
 			this.state.points[kSelected] = p;
 			diagramChanged = true;
 		}
 
-		if (state.mouseButtonPressed(3) && kSelected >= 0) {
+		if (inputState.mouseButtonPressed(3) && kSelected >= 0) {
 			Vector d = p.sub(this.state.points[kSelected]);
 			this.state.angles[kSelected] = d.angle() - this.state.rotate;
 			diagramChanged = true;
 		}
+	}
 
+	private void applySiteKeys(InputEvent event, Vector pointerWorld) {
 		if (event.isKeyPress(KeyCode.E)) {
 			int k = nearestK(pointerWorld, mouseReach * pixelWidth);
 			if (k >= 0) {
@@ -822,8 +822,9 @@ public class RVDExplorer implements Drawing {
 			}
 			diagramChanged = true;
 		}
+	}
 
-
+	private void applyToggleKeys(InputEvent event) {
 		if (event.isKeyPress(KeyCode.G))   snapToGrid               ^= true;
 		if (event.isKeyPress(KeyCode.C))   showCircles              ^= true;
 		if (event.isKeyPress(KeyCode.R))   showRays                 ^= true;
@@ -837,11 +838,34 @@ public class RVDExplorer implements Drawing {
 		if (event.isKeyPress(KeyCode.S)) { showShading              ^= true; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.Y)) { polygonMode              ^= true; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.X)) { showPolygonExterior      ^= true; diagramChanged = true; }
+	}
 
+	private void applyDiagramModeKeys(InputEvent event) {
 		if (event.isKeyPress(KeyCode.F2)) { diagram = DiagramType.RVD_RAYS_ORIENTED  ; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.F3)) { diagram = DiagramType.RVD_LINES          ; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.F4)) { diagram = DiagramType.RVD_RAYS_UNORIENTED; diagramChanged = true; }
 		if (event.isKeyPress(KeyCode.F5)) { diagram = DiagramType.DISK_DIAGRAM       ; diagramChanged = true; }
+	}
+
+	private void handleEditorInput(InputEvent event, InputState inputState, Vector pointerWorld) {
+		Vector p = snapToGrid ? pointerWorld.round(gridCellD) : pointerWorld;
+
+		updateSelectionStart(event, pointerWorld);
+		updateDraggingState(inputState, pointerWorld);
+		applyPointerEdits(inputState, p);
+		applySiteKeys(event, pointerWorld);
+		applyToggleKeys(event);
+		applyDiagramModeKeys(event);
+	}
+
+
+	@Override
+	public void receiveEvent(View view, InputEvent event, InputState state, Vector pointerWorld, Vector pointerViewBase) {
+		if (state.keyPressed(KeyCode.CONTROL)) {
+			camera.receiveEvent(view, event, state, pointerWorld, pointerViewBase);
+			return;
+		}
+		handleEditorInput(event, state, pointerWorld);
 	}
 
 
