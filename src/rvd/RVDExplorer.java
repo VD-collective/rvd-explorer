@@ -67,11 +67,6 @@ public class RVDExplorer implements Drawing {
 	DiagramType diagram = DiagramType.RVD_RAYS_ORIENTED;
 
 	@GadgetBoolean
-	@Properties(name = "Polygon mode (y)")
-	boolean polygonMode = true;
-
-
-	@GadgetBoolean
 	@Properties(name = "Show diagram (d)")
 	boolean showDiagram = true;
 
@@ -104,7 +99,24 @@ public class RVDExplorer implements Drawing {
 	@Properties(name = "Show circles (c)")
 	boolean showCircles = false;
 
+	@GadgetBoolean
+	@Properties(name = "Snap to grid (g)")
+	boolean snapToGrid = false;
 
+	@GadgetColorPicker
+	@Properties(name = "Background color")
+	Color colorBackground = Color.gray(0.2);
+
+
+	@GadgetBoolean
+	@Properties(name = "Polygon mode (y)")
+	boolean polygonMode = true;
+
+	@GadgetBoolean
+	@Properties(name = "Edge-aligned polygon rays (i)")
+	boolean brocardIllumination = true;
+
+	private boolean prevBrocardIllumination = true;
 
 	@GadgetBoolean
 	@Properties(name = "Show polygon exterior (x)")
@@ -119,13 +131,9 @@ public class RVDExplorer implements Drawing {
 	boolean visibilityCellsShadingCount = true;
 
 
-	@GadgetColorPicker
-	@Properties(name = "Background color")
-	Color colorBackground = Color.gray(0.2);
 
-	@GadgetBoolean
-	@Properties(name = "Snap to grid (g)")
-	boolean snapToGrid = false;
+
+
 
 
 
@@ -137,7 +145,7 @@ public class RVDExplorer implements Drawing {
 	private Polygon polygon;
 
 	RVDColor rvdColorBackground;
-	
+
 	private final BrocardTracker brocardTracker = new BrocardTracker();
 	private final DiagramFrameCoordinator diagramFrameCoordinator = new DiagramFrameCoordinator();
 	private final RasterDiagramRenderer rasterDiagramRenderer = new RasterDiagramRenderer();
@@ -269,6 +277,18 @@ public class RVDExplorer implements Drawing {
 		brocardTracker.reset();
 	}
 
+	private double[] computeEffectiveAngles() {
+		double[] effectiveAngles = new double[state.n];
+		if (polygonMode && brocardIllumination) {
+			for (int i = 0; i < state.n; i++) {
+				effectiveAngles[i] = state.points[(i + 1) % state.n].sub(state.points[i]).angle();
+			}
+		} else {
+			System.arraycopy(state.angles, 0, effectiveAngles, 0, state.n);
+		}
+		return effectiveAngles;
+	}
+
 	private PointResult classifyPoint(Vector p, Figure[][] dominanceRegion, Ray[] rays) {
 		return (diagram == DiagramType.DISK_DIAGRAM)
 				? findDDCell(p, dominanceRegion)
@@ -288,13 +308,19 @@ public class RVDExplorer implements Drawing {
 			return null;
 		}
 
+		double[] effectiveAngles = computeEffectiveAngles();
 		DiagramPreparation.PreparedData prepared = DiagramPreparation.prepare(
 				state.points,
-				state.angles,
+				effectiveAngles,
 				state.n,
 				state.rotate,
 				polygonMode,
-				this::dominanceFor
+				(i0, i1, anglesForDominance) -> DominanceRegionFactory.create(
+						state.points[i0],
+						state.points[i1],
+						anglesForDominance[i0],
+						anglesForDominance[i1]
+				)
 		);
 		polygon = prepared.polygon();
 		Ray[] rays = prepared.rays();
@@ -350,9 +376,20 @@ public class RVDExplorer implements Drawing {
 		if (showHelp           ) HelpOverlayDrawer.draw(view);
 	}
 
+	/** When turning Brocard illumination off in polygon mode, align stored ray angles to polygon edges. */
+	private void snapAnglesToPolygonEdgesIfTurningOffIllumination(boolean wasIlluminated, boolean isIlluminated) {
+		if (polygonMode && wasIlluminated && !isIlluminated) {
+			for (int i = 0; i < state.n; i++) {
+				state.angles[i] = state.points[(i + 1) % state.n].sub(state.points[i]).angle();
+			}
+		}
+	}
+
 
 	@Override
 	public void valuesChanged() {
+		snapAnglesToPolygonEdgesIfTurningOffIllumination(prevBrocardIllumination, brocardIllumination);
+		prevBrocardIllumination = brocardIllumination;
 		diagramFrameCoordinator.markDirty();
 	}
 
@@ -468,6 +505,13 @@ public class RVDExplorer implements Drawing {
 		if (event.isKeyPress(KeyCode.L)) { showColor                ^= true; diagramFrameCoordinator.markDirty(); }
 		if (event.isKeyPress(KeyCode.S)) { showShading              ^= true; diagramFrameCoordinator.markDirty(); }
 		if (event.isKeyPress(KeyCode.Y)) { polygonMode              ^= true; diagramFrameCoordinator.markDirty(); }
+		if (event.isKeyPress(KeyCode.I)) {
+			boolean wasIllumination = brocardIllumination;
+			brocardIllumination ^= true;
+			snapAnglesToPolygonEdgesIfTurningOffIllumination(wasIllumination, brocardIllumination);
+			prevBrocardIllumination = brocardIllumination;
+			diagramFrameCoordinator.markDirty();
+		}
 		if (event.isKeyPress(KeyCode.X)) { showPolygonExterior      ^= true; diagramFrameCoordinator.markDirty(); }
 	}
 
