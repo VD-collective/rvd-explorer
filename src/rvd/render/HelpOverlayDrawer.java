@@ -20,7 +20,6 @@ public class HelpOverlayDrawer {
                 "    F3              - Show RVD for lines",
                 "    F4              - Show Disk Diagram",
                 "    y               - Toggle polygon mode",
-                "    i               - Toggle edge-aligned polygon rays (Brocard illumination)",
                 "    d               - Toggle show diagram",
                 "    k               - Toggle show diagram skeleton",
                 "    b               - Toggle show points of the maximum angle",
