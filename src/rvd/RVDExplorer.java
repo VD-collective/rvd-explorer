@@ -351,8 +351,10 @@ public class RVDExplorer implements Drawing {
 	}
 
 	private void drawVisibleLayers(View view) {
+		double[] effectiveAngles = computeEffectiveAngles();
 		OverlayDrawer.Context overlayContext = new OverlayDrawer.Context(
 				state,
+				effectiveAngles,
 				hues,
 				kSelected,
 				polygon,
@@ -366,7 +368,7 @@ public class RVDExplorer implements Drawing {
 		if (showDiagram        ) diagramFrameCoordinator.drawDiagram(view, this::makeImage);
 		if (polygonMode        ) OverlayDrawer.drawPolygon(view, overlayContext);
 		if (showVisibilityCells) OverlayDrawer.drawVisibilityCells(view, overlayContext);
-		if (showCircles        ) OverlayDrawer.drawCircles(view, overlayContext, this::dominanceFor);
+		if (showCircles        ) OverlayDrawer.drawCircles(view, overlayContext, (i0, i1) -> dominanceFor(i0, i1, effectiveAngles));
 		if (showRays           ) OverlayDrawer.drawRays(view, overlayContext);
 		if (showPoints         ) OverlayDrawer.drawPoints(view, overlayContext);
 		if (showBrocardPoint   ) OverlayDrawer.drawBrocardPoint(view, brocardTracker.point(), overlayContext);

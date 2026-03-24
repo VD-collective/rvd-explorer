@@ -20,6 +20,7 @@ public class OverlayDrawer {
 
     public record Context(
             ExplorerState state,
+            double[] effectiveAngles,
             double[] hues,
             int selectedIndex,
             Polygon polygon,
@@ -32,10 +33,11 @@ public class OverlayDrawer {
 
     public static void drawRays(View view, Context context) {
         ExplorerState state = context.state();
+        double[] effectiveAngles = context.effectiveAngles();
         view.setLineWidth(context.strokeWidth() * context.pixelWidth());
 
         for (int k = 0; k < state.n; k++) {
-            Ray ray = Ray.pd(state.points[k], Vector.polar(state.angles[k] + state.rotate));
+            Ray ray = Ray.pd(state.points[k], Vector.polar(effectiveAngles[k] + state.rotate));
             view.setStroke(colorStrokeRay(context.hues(), k, state.enabled[k], k == context.selectedIndex()));
             view.strokeRay(ray);
         }
