@@ -70,6 +70,10 @@ public class RVDExplorer implements Drawing {
 	@Properties(name = "Polygon mode (y)")
 	boolean polygonMode = true;
 
+	@GadgetBoolean
+	@Properties(name = "Edge-aligned polygon rays (i)")
+	boolean brocardIllumination = true;
+
 
 	@GadgetBoolean
 	@Properties(name = "Show diagram (d)")
@@ -257,17 +261,34 @@ public class RVDExplorer implements Drawing {
 
 
 	Figure dominanceFor(int i0, int i1) {
+		return dominanceFor(i0, i1, state.angles);
+	}
+
+
+	Figure dominanceFor(int i0, int i1, double[] angles) {
 		return DominanceRegionFactory.create(
 				state.points[i0],
 				state.points[i1],
-				state.angles[i0],
-				state.angles[i1]
+				angles[i0],
+				angles[i1]
 		);
 	}
 
 
 	private void resetBrocardSearch() {
 		brocardTracker.reset();
+	}
+
+	private double[] computeEffectiveAngles() {
+		double[] effectiveAngles = new double[state.n];
+		if (polygonMode && brocardIllumination) {
+			for (int i = 0; i < state.n; i++) {
+				effectiveAngles[i] = state.points[(i + 1) % state.n].sub(state.points[i]).angle();
+			}
+		} else {
+			System.arraycopy(state.angles, 0, effectiveAngles, 0, state.n);
+		}
+		return effectiveAngles;
 	}
 
 	private PointResult classifyPoint(Vector p, Figure[][] dominanceRegion, Ray[] rays) {
@@ -289,13 +310,14 @@ public class RVDExplorer implements Drawing {
 			return null;
 		}
 
+		double[] effectiveAngles = computeEffectiveAngles();
 		DiagramPreparation.PreparedData prepared = DiagramPreparation.prepare(
 				state.points,
-				state.angles,
+				effectiveAngles,
 				state.n,
 				state.rotate,
 				polygonMode,
-				this::dominanceFor
+				(i0, i1, angles) -> dominanceFor(i0, i1, angles)
 		);
 		polygon = prepared.polygon();
 		Ray[] rays = prepared.rays();
@@ -469,6 +491,7 @@ public class RVDExplorer implements Drawing {
 		if (event.isKeyPress(KeyCode.L)) { showColor                ^= true; diagramFrameCoordinator.markDirty(); }
 		if (event.isKeyPress(KeyCode.S)) { showShading              ^= true; diagramFrameCoordinator.markDirty(); }
 		if (event.isKeyPress(KeyCode.Y)) { polygonMode              ^= true; diagramFrameCoordinator.markDirty(); }
+		if (event.isKeyPress(KeyCode.I)) { brocardIllumination      ^= true; diagramFrameCoordinator.markDirty(); }
 		if (event.isKeyPress(KeyCode.X)) { showPolygonExterior      ^= true; diagramFrameCoordinator.markDirty(); }
 	}
 
