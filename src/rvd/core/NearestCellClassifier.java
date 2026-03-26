@@ -5,8 +5,6 @@ import xyz.marsavic.geometry.Vector;
 
 public class NearestCellClassifier {
 
-    private static final RayNearestSelector rayNearestSelector = new RayNearestSelector();
-
     public record Result(int index, int visibleCount, double angle) {}
 
     public static Result classify(
@@ -18,7 +16,7 @@ public class NearestCellClassifier {
             boolean includeMirroredRay,
             double stopAngleThreshold
     ) {
-        RayNearestSelector.Result nearest = rayNearestSelector.select(
+        RayNearestSelector.Result nearest = RayNearestSelector.select(
                 p,
                 rays,
                 enabled,

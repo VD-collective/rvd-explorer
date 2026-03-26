@@ -13,8 +13,10 @@ public class BrocardTracker {
     }
 
     public void observe(int index, double candidateAngle, Vector candidatePoint) {
-        // Preserves legacy sentinel behavior from RVDExplorer:
-        // -1 = skeleton, -2 = aperture-clipped, -3 = out of domain.
+        // i = -1    In the domain, but on the skeleton
+        // i = -2    In the domain, but inside the aperture
+        // i = -3    Out of the domain, but on the skeleton
+        // i = -4    Out of the domain
         if (index >= -2 && candidateAngle > angle) {
             angle = candidateAngle;
             point = candidatePoint;

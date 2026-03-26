@@ -122,7 +122,7 @@ public class RasterDiagramRenderer {
                 } else {
                     RVDColor sum = new RVDColor();
                     for (int idx = 0; idx < N_VALUES; idx++) {
-                        int idy = Integer.reverse(idx) >>> (32 - N_BITS); // preserved ordering from original logic
+                        int idy = Integer.reverse(idx) >>> (32 - N_BITS);
 
                         Vector cPixel = Vector.xy(x + (idx + 0.5) / N_VALUES, y + (idy + 0.5) / N_VALUES);
                         Vector p = tFromPixels.applyTo(cPixel);

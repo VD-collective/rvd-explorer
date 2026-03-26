@@ -193,7 +193,8 @@ public class RVDExplorer implements Drawing {
 	private RVDColor colorDiagram(PointResult ia) {
 		if (ia.i == -1) return RVDColor.BLACK;
 		if (ia.i == -2) return rvdColorBackground;
-		if (ia.i == -3) return rvdColorBackground;
+		if (ia.i == -3) return RVDColor.BLACK;
+		if (ia.i == -4) return rvdColorBackground;
 		double b = showShading ? 0.9 - 0.6 * ia.a : 1.0;
 		if (visibilityCellsShadingCount) b *= (double) ia.nVisible / state.n;
 		return showColor ? colorsDiagram[ia.i].mul(b) : new RVDColor(b);
@@ -202,21 +203,22 @@ public class RVDExplorer implements Drawing {
 	private record PointResult(int i, int nVisible, double a) {
 		// i = -1    In the domain, but on the skeleton
 		// i = -2    In the domain, but inside the aperture
-		// i = -3    Out of the domain
+		// i = -3    Out of the domain, but on the skeleton
+		// i = -4    Out of the domain
 	}
 
 	private static final double rEdge = 1.6;
-	private static final int nEdgeSamples = 6;
+	private static final int nNeighbors = 6;
 
 	private PointResult findNearest(Vector p, Ray[] rays) {
 		PointResult iaCenter = findNearest_(p, rays);
 
 		if (showDiagramSkeleton) {
-			for (int k = 0; k < nEdgeSamples; k++) {
-				Vector q = Vector.polar(rEdge, (double) k / nEdgeSamples).add(p);
-				PointResult iaEdge = findNearest_(q, rays);
-				if (iaEdge.i != iaCenter.i) {
-					return new PointResult(-1, iaCenter.nVisible, iaCenter.a);
+			for (int k = 0; k < nNeighbors; k++) {
+				Vector q = Vector.polar(rEdge, (double) k / nNeighbors).add(p);
+				PointResult iaNeighbor = findNearest_(q, rays);
+				if (iaNeighbor.i != iaCenter.i) {
+					return new PointResult((iaCenter.i == -4) ? -3 : -1, iaCenter.nVisible, iaCenter.a);
 				}
 			}
 		}
@@ -251,7 +253,6 @@ public class RVDExplorer implements Drawing {
 	private PointResult findDDCell(Vector p, Figure[][] dominances) {
 		int k = DiskCellSelector.select(p, dominances, state.enabled, state.n);
 		return new PointResult(k, 0, 0.0);
-//		return new IndexAngle(dominances[0][1].contains(p) ? 0 : -1, 0);
 	}
 
 
@@ -341,12 +342,12 @@ public class RVDExplorer implements Drawing {
 		);
 
 		if (showDiagram        ) diagramFrameCoordinator.drawDiagram(view, this::makeImage);
-		if (showBrocardPoint   ) OverlayDrawer.drawBrocardPoint(view, brocardTracker.point(), overlayContext);
 		if (polygonMode        ) OverlayDrawer.drawPolygon(view, overlayContext);
 		if (showVisibilityCells) OverlayDrawer.drawVisibilityCells(view, overlayContext);
 		if (showCircles        ) OverlayDrawer.drawCircles(view, overlayContext, this::dominanceFor);
 		if (showRays           ) OverlayDrawer.drawRays(view, overlayContext);
 		if (showPoints         ) OverlayDrawer.drawPoints(view, overlayContext);
+		if (showBrocardPoint   ) OverlayDrawer.drawBrocardPoint(view, brocardTracker.point(), overlayContext);
 		if (showHelp           ) HelpOverlayDrawer.draw(view);
 	}
 
