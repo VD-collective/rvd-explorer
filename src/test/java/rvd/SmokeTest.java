@@ -8,6 +8,6 @@ class SmokeTest {
 
     @Test
     void sanity() {
-        assertTrue(true);
+        assertTrue(false);
     }
 }
