@@ -1,0 +1,34 @@
+# When you publish a GitHub Release, build a fat JAR and attach it to that release.
+
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  attach-jar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Liberica JDK 25 (with JavaFX)
+        uses: actions/setup-java@v4
+        with:
+          distribution: liberica
+          java-version: "25"
+          java-package: jdk+fx
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run tests and build fat JAR
+        run: chmod +x gradlew && ./gradlew check shadowJar --no-daemon
+
+      - name: Upload JAR to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/libs/rvd-explorer-all.jar

@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'com.gradleup.shadow' version '9.4.0'
 }
 
 group = 'rvd'
@@ -68,4 +69,15 @@ tasks.withType(Test).configureEach {
 tasks.named('run') {
     jvmArgs += ['--add-modules', javafxModules.join(',')]
     workingDir = projectDir
+}
+
+// Fat JAR for releases: app + local JAR deps. Run with JDK+FX 25, e.g.:
+//   java --add-modules javafx.controls -jar rvd-explorer-all.jar
+tasks.shadowJar {
+    mergeServiceFiles()
+    archiveFileName = 'rvd-explorer-all.jar'
+    duplicatesStrategy = DuplicatesStrategy.WARN
+    manifest {
+        attributes 'Main-Class': application.mainClass.get()
+    }
 }
