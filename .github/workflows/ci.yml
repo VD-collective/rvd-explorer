@@ -1,0 +1,35 @@
+# Build and test on every PR and on pushes to main.
+# Uses BellSoft Liberica JDK 25 with JavaFX (jdk+fx) so --add-modules javafx.* works like local JDK+FX.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Liberica JDK 25 (with JavaFX)
+        uses: actions/setup-java@v4
+        with:
+          distribution: liberica
+          java-version: "25"
+          java-package: jdk+fx
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        run: chmod +x gradlew && ./gradlew build --no-daemon
