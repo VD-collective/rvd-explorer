@@ -72,10 +72,10 @@ tasks.named('run') {
 }
 
 // Fat JAR for releases: app + local JAR deps. Run with JDK+FX 25, e.g.:
-//   java --add-modules javafx.controls -jar rvd-explorer-all.jar
+//   java --add-modules javafx.controls -jar rvd-explorer.jar
 tasks.shadowJar {
     mergeServiceFiles()
-    archiveFileName = 'rvd-explorer-all.jar'
+    archiveFileName = 'rvd-explorer.jar'
     duplicatesStrategy = DuplicatesStrategy.WARN
     manifest {
         attributes 'Main-Class': application.mainClass.get()
