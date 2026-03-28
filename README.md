@@ -114,9 +114,9 @@ If you use this software or its ideas in a **scientific** context (publications,
 
 > *(Citation and link to be updated.)*
 
-## How to contact
+## How to get in touch
 
-For questions, collaborations, or anything not covered above:
+For everything not covered here:
 
 - **Marko Savić** — [marko.savic@dmi.uns.ac.rs](mailto:marko.savic@dmi.uns.ac.rs)
 - **Ioannis Mantas** — [ioanni.mantas@gmail.com](mailto:ioanni.mantas@gmail.com)
