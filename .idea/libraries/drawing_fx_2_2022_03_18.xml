@@ -1,7 +1,7 @@
 <component name="libraryTable">
   <library name="drawing-fx-2-2022-03-18">
     <CLASSES>
-      <root url="jar://$PROJECT_DIR$/drawing-fx-2-2022-03-18.jar!/" />
+      <root url="jar://$PROJECT_DIR$/libs/drawing-fx-2-2022-03-18.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

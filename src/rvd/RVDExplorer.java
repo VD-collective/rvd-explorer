@@ -80,7 +80,7 @@ public class RVDExplorer implements Drawing {
 
 	@GadgetBoolean
 	@Properties(name = "Show distance shading (s)")
-	boolean showShading = true;
+	boolean showShading = false;
 
 	@GadgetBoolean
 	@Properties(name = "Color regions (l)")
@@ -125,7 +125,7 @@ public class RVDExplorer implements Drawing {
 
 	@GadgetBoolean
 	@Properties(name = "Show visibility cells depth")
-	boolean visibilityCellsShadingCount = true;
+	boolean visibilityCellsShadingCount = false;
 
 	double[] hues = new double[maxN];
 	int kSelected = -1;

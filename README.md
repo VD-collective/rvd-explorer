@@ -110,13 +110,26 @@ The same simple-polygon setting with rays pointing in the interior, and addition
 
 ## How to give credit
 
-If you use this software or its ideas in a **scientific** context (publications, talks, coursework with attribution), please **cite the associated paper** *Interactive Uniform Floodlight Illumination and Rotating Rays Voronoi diagrams* which will be presented in **35th International Computational Geometry Media Exposition**, part of **Computational Geometry Week 2026**, taking place in **NJ, USA**.
+If you use this software or its ideas in a scientific context, please cite the associated paper [*Interactive Uniform Floodlight Illumination and Rotating Rays Voronoi diagrams*](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.SoCG.2026.98) which was presented in [**Computational Geometry (CG) Week 2026**](https://cgweek26.computational-geometry.org/).
 
-> *(Citation and link to be updated.)*
+```bibtex
+@InProceedings{rvd_socg_2026,
+  author    = {Alegr{\'\i}a, Carlos and Mantas, Ioannis and Savi\'{c}, Marko and Suderland, Martin},
+  title     = {{Interactive Uniform Floodlight Illumination and Rotating Rays Voronoi Diagrams}},
+  booktitle = {42nd International Symposium on Computational Geometry (SoCG 2026)},
+  pages     = {98:1--98:7},
+  series    = {Leibniz International Proceedings in Informatics (LIPIcs)},
+  year      = {2026},
+  volume    = {367},
+  editor    = {Ahn, Hee-Kap and Hoffmann, Michael and Nayyeri, Amir},
+  publisher = {Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
+  doi       = {10.4230/LIPIcs.SoCG.2026.98},
+}
+```
 
 ## How to get in touch
 
-For everything not covered here:
+For everything not covered here you can contact:
 
 - **Marko Savić** — [marko.savic@dmi.uns.ac.rs](mailto:marko.savic@dmi.uns.ac.rs)
 - **Ioannis Mantas** — [ioanni.mantas@gmail.com](mailto:ioanni.mantas@gmail.com)
@@ -194,7 +207,7 @@ Prebuilt **`rvd-explorer.jar`** may be attached to **GitHub Releases** when you 
 
 | Kind | Artifact |
 |------|-----------|
-| Local JARs (committed next to `build.gradle`) | `drawing-fx-2-2022-03-18.jar`, `mars-bits-2026-03-18.jar` |
+| Local JARs (in `libs/`) | `libs/drawing-fx-2-2022-03-18.jar`, `libs/mars-bits-2026-03-18.jar` |
 | Tests | JUnit 5 (via `junit-bom` on Maven Central) |
 
 JavaFX comes from the **JDK+FX** install, not from Maven in this project.
@@ -217,6 +230,7 @@ JavaFX comes from the **JDK+FX** install, not from Maven in this project.
 - `src/` — main Java sources and `META-INF` (test sources are under `src/test/java`, not under `src/test/` inside `src/`).
 - `images/` — image resources used by the app.
 - `docs/figures/` — figures used in this README.
+- `libs/` — vendored dependency JARs (`drawing-fx`, `mars-bits`).
 - `build.gradle`, `settings.gradle`, `gradlew*` — Gradle build and wrapper.
 - `.github/workflows/` — CI and release automation.
 
