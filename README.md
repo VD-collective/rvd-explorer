@@ -207,7 +207,7 @@ Prebuilt **`rvd-explorer.jar`** may be attached to **GitHub Releases** when you 
 
 | Kind | Artifact |
 |------|-----------|
-| Local JARs (committed next to `build.gradle`) | `drawing-fx-2-2022-03-18.jar`, `mars-bits-2026-03-18.jar` |
+| Local JARs (in `libs/`) | `libs/drawing-fx-2-2022-03-18.jar`, `libs/mars-bits-2026-03-18.jar` |
 | Tests | JUnit 5 (via `junit-bom` on Maven Central) |
 
 JavaFX comes from the **JDK+FX** install, not from Maven in this project.
@@ -230,6 +230,7 @@ JavaFX comes from the **JDK+FX** install, not from Maven in this project.
 - `src/` — main Java sources and `META-INF` (test sources are under `src/test/java`, not under `src/test/` inside `src/`).
 - `images/` — image resources used by the app.
 - `docs/figures/` — figures used in this README.
+- `libs/` — vendored dependency JARs (`drawing-fx`, `mars-bits`).
 - `build.gradle`, `settings.gradle`, `gradlew*` — Gradle build and wrapper.
 - `.github/workflows/` — CI and release automation.
 

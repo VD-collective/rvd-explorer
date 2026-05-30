@@ -41,7 +41,9 @@ sourceSets {
 }
 
 dependencies {
-    implementation files('drawing-fx-2-2022-03-18.jar', 'mars-bits-2026-03-18.jar')
+    implementation files(
+            'libs/drawing-fx-2-2022-03-18.jar',
+            'libs/mars-bits-2026-03-18.jar')
 
     testImplementation platform('org.junit:junit-bom:5.14.3')
     testImplementation 'org.junit.jupiter:junit-jupiter'

@@ -1,7 +1,7 @@
 <component name="libraryTable">
   <library name="mars-bits-2026-03-18">
     <CLASSES>
-      <root url="jar://$PROJECT_DIR$/mars-bits-2026-03-18.jar!/" />
+      <root url="jar://$PROJECT_DIR$/libs/mars-bits-2026-03-18.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />
