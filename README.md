@@ -110,13 +110,26 @@ The same simple-polygon setting with rays pointing in the interior, and addition
 
 ## How to give credit
 
-If you use this software or its ideas in a **scientific** context (publications, talks, coursework with attribution), please **cite the associated paper** *Interactive Uniform Floodlight Illumination and Rotating Rays Voronoi diagrams* which will be presented in **35th International Computational Geometry Media Exposition**, part of **Computational Geometry Week 2026**, taking place in **NJ, USA**.
+If you use this software or its ideas in a scientific context, please cite the associated paper [*Interactive Uniform Floodlight Illumination and Rotating Rays Voronoi diagrams*](https://drops.dagstuhl.de/entities/document/10.4230/LIPIcs.SoCG.2026.98) which was presented in [**Computational Geometry (CG) Week 2026**](https://cgweek26.computational-geometry.org/).
 
-> *(Citation and link to be updated.)*
+```bibtex
+@InProceedings{rvd_socg_2026,
+  author    = {Alegr{\'\i}a, Carlos and Mantas, Ioannis and Savi\'{c}, Marko and Suderland, Martin},
+  title     = {{Interactive Uniform Floodlight Illumination and Rotating Rays Voronoi Diagrams}},
+  booktitle = {42nd International Symposium on Computational Geometry (SoCG 2026)},
+  pages     = {98:1--98:7},
+  series    = {Leibniz International Proceedings in Informatics (LIPIcs)},
+  year      = {2026},
+  volume    = {367},
+  editor    = {Ahn, Hee-Kap and Hoffmann, Michael and Nayyeri, Amir},
+  publisher = {Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
+  doi       = {10.4230/LIPIcs.SoCG.2026.98},
+}
+```
 
 ## How to get in touch
 
-For everything not covered here:
+For everything not covered here you can contact:
 
 - **Marko Savić** — [marko.savic@dmi.uns.ac.rs](mailto:marko.savic@dmi.uns.ac.rs)
 - **Ioannis Mantas** — [ioanni.mantas@gmail.com](mailto:ioanni.mantas@gmail.com)
