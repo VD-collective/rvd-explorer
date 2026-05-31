@@ -1,6 +1,6 @@
 # rvd-explorer
 
-Desktop explorer for **rotational Voronoi–style diagrams**, built with **Java 25**, **JavaFX**, and the **DrawingFX** / **mars-bits** libraries. The main entry point is `rvd.RVDExplorer`: a single window with interactive gadgets, diagram modes, and serialization via the “Data String” field.
+Interactive visualization software for **Rotating Rays Voronoi diagrams**, built with **Java 25** and **JavaFX**.
 
 ## Overview
 
@@ -114,16 +114,18 @@ If you use this software or its ideas in a scientific context, please cite the a
 
 ```bibtex
 @InProceedings{rvd_socg_2026,
-  author    = {Alegr{\'\i}a, Carlos and Mantas, Ioannis and Savi\'{c}, Marko and Suderland, Martin},
-  title     = {{Interactive Uniform Floodlight Illumination and Rotating Rays Voronoi Diagrams}},
-  booktitle = {42nd International Symposium on Computational Geometry (SoCG 2026)},
-  pages     = {98:1--98:7},
-  series    = {Leibniz International Proceedings in Informatics (LIPIcs)},
-  year      = {2026},
-  volume    = {367},
-  editor    = {Ahn, Hee-Kap and Hoffmann, Michael and Nayyeri, Amir},
-  publisher = {Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
-  doi       = {10.4230/LIPIcs.SoCG.2026.98},
+  title={Interactive Uniform Floodlight Illumination and Rotating Rays Voronoi Diagrams (Media Exposition)},
+  author={Alegr{\'\i}a, Carlos and Mantas, Ioannis and Savi{\'c}, Marko and Suderland, Martin},
+  booktitle={42nd International Symposium on Computational Geometry (SoCG 2026)},
+  pages={98--1},
+  year={2026},
+  organization={Schloss Dagstuhl--Leibniz-Zentrum f{\"u}r Informatik}
+}
+@article{rvd_explorer_2026,
+  title={RVD-explorer},
+  author={Alegr{\'\i}a, Carlos and Mantas, Ioannis and Savi{\'c}, Marko and Suderland, Martin},
+  year={2026},
+  publisher={Schloss Dagstuhl--Leibniz-Zentrum f{\"u}r Informatik}
 }
 ```
 
