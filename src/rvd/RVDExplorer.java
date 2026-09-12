@@ -1,15 +1,22 @@
 package rvd;
 
+import javafx.application.Platform;
+import javafx.scene.control.Alert;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
+import javafx.stage.FileChooser;
+import javafx.stage.Window;
 import rvd.core.DiagramPreparation;
 import rvd.core.DominanceRegionFactory;
 import rvd.core.DiskCellSelector;
 import rvd.core.NearestCellClassifier;
 import rvd.core.PolygonVisibility;
-import rvd.io.ExplorerDataCodec;
-import rvd.model.ExplorerSnapshot;
+import rvd.io.ExplorerFileIo;
+import rvd.io.ExplorerJsonCodec;
+import rvd.io.ExplorerJsonException;
+import rvd.model.ExplorerInstance;
 import rvd.model.ExplorerState;
+import rvd.model.ExplorerViewSettings;
 import rvd.render.BrocardTracker;
 import rvd.render.DiagramFrameCoordinator;
 import rvd.render.HelpOverlayDrawer;
@@ -31,9 +38,8 @@ import xyz.marsavic.random.sampling.Sampler;
 import xyz.marsavic.utils.Hash;
 import xyz.marsavic.utils.Numeric;
 
-enum DiagramType {
-	RVD_RAYS_ORIENTED, RVD_RAYS_UNORIENTED, RVD_LINES, DISK_DIAGRAM
-}
+import java.io.File;
+import java.io.IOException;
 
 
 public class RVDExplorer implements Drawing {
@@ -42,13 +48,69 @@ public class RVDExplorer implements Drawing {
 
 	private final int maxN = 64;
 
+	/** Former Base64 datastring default, converted to JSON sites + current view defaults. */
+private static final String DEFAULT_INSTANCE_JSON = """
+		{
+		  "version": "1",
+		  "rotate": 0.0,
+  "n": 7,
+  "sites": [
+    {
+      "x": 1.0,
+      "y": 0.0,
+      "angle": 0.5957614938397598,
+      "enabled": true
+    },
+    {
+      "x": 3.0,
+      "y": 5.196152422706632,
+      "angle": 0.5957614938397598,
+      "enabled": true
+    },
+    {
+      "x": -3.0,
+      "y": 5.196152422706632,
+      "angle": 0.8333333333333333,
+      "enabled": true
+    },
+    {
+      "x": -6.0,
+      "y": 0.0,
+      "angle": 0.0,
+      "enabled": true
+    },
+    {
+      "x": -3.0,
+      "y": -5.196152422706632,
+      "angle": 0.1666666666666667,
+      "enabled": true
+    },
+    {
+      "x": 3.0,
+      "y": -5.196152422706632,
+      "angle": 0.3333333333333333,
+      "enabled": true
+    },
+    {
+      "x": 6.0,
+      "y": 0.0,
+      "angle": 0.5833333333333333,
+      "enabled": true
+    }
+  ],
+		  "diagramType": "RVD_RAYS_ORIENTED",
+		  "polygonMode": true,
+		  "brocardIllumination": false,
+		  "showPolygonExterior": false,
+		  "showVisibilityCells": false,
+		  "stopAngle1": 1.0,
+		  "stopAngle2": 1.0
+		}
+		""";
+
 	@GadgetBoolean
 	@Properties(name = "Help (h)")
 	boolean showHelp = false;
-
-	@GadgetString
-	@Properties(name = "Data String")
-	String dataString = "rO0ABXoAAAHOAAAAAAAAAAAAAAASQE+AAAAAAADANgAAAAAAAD/RI++HH+QVAUA5AAAAAAAAQHPAAAAAAAA/4Pne7C5yLAHARQAAAAAAAEBy8AAAAAAAP+gyHxB0iNkBwD0AAAAAAADAQYAAAAAAAD/TRHIvdh0DAcBgYAAAAAAAQHEAAAAAAAA/4kplNrs9TwHAZ6AAAAAAAEBugAAAAAAAP+j+t2xMBQABwFyAAAAAAADAYOAAAAAAAD/XOrCUFp4CAcBuQAAAAAAAQCwAAAAAAAA/4oc8EYd5zgHAc6AAAAAAAMA5AAAAAAAAP+ru8xZW8P0BwGkgAAAAAADAaOAAAAAAAD/sTJsOBK9AAcBXQAAAAAAAwHJwAAAAAAA/dTFG2BgVNwFAYyAAAAAAAMBx8AAAAAAAP8WHD651nQIBQGkgAAAAAADAaUAAAAAAAD/Jt2jYeCQXAUBy4AAAAAAAQFzAAAAAAAA/2XICjs75hAFAcCAAAAAAAEBigAAAAAAAP+VYCjrljjYBQGNAAAAAAADAQIAAAAAAAD/MrdmdrBhQAUBpgAAAAAAAQHDwAAAAAAA/3G85j2AqXQFAYaAAAAAAAEByYAAAAAAAP+bEe81fa/AB";
 
 	@RecurseGadgets
 	final ExplorerState state = new ExplorerState(maxN);
@@ -142,19 +204,10 @@ public class RVDExplorer implements Drawing {
 	CameraSimple camera = new CameraSimple(F_R_R.cutoff01(t -> F_R_R.power(t, 8)));
 	double pixelWidth;
 
-
-
-	private String dataAsString() {
-		return ExplorerDataCodec.encode(state.snapshot());
-	}
-
-
-	private void stringToData(String data) {
-		ExplorerSnapshot snapshot = ExplorerDataCodec.decode(data);
-		if (snapshot != null) {
-			state.applySnapshot(snapshot);
-		}
-	}
+	// After FileChooser, Control can stay pressed in InputState; ignore it for camera until released.
+	private boolean ignoreControlModifierForCamera;
+	private Alert activeErrorAlert = null;
+	private String activeErrorDialogKey = null;
 
 
 	{
@@ -167,6 +220,12 @@ public class RVDExplorer implements Drawing {
 			state.angles[k] = sampler.uniform();
 			state.enabled[k] = true;
 			hues[k] = 360 * k * Numeric.PHI;
+		}
+
+		try {
+			applyInstance(ExplorerJsonCodec.decode(DEFAULT_INSTANCE_JSON));
+		} catch (ExplorerJsonException e) {
+			throw new IllegalStateException("Default instance JSON is invalid", e);
 		}
 	}
 
@@ -335,11 +394,36 @@ public class RVDExplorer implements Drawing {
 
 
 	private void updateDrawInvalidationState(View view) {
-		diagramFrameCoordinator.updateInvalidationState(view, dataString, this::stringToData);
+		diagramFrameCoordinator.updateInvalidationState(view);
 	}
 
 	private void syncFrameState(View view) {
-		dataString = diagramFrameCoordinator.syncFrameState(view, this::dataAsString);
+		diagramFrameCoordinator.syncFrameState(view);
+	}
+
+	private ExplorerInstance captureInstance() {
+		return new ExplorerInstance(state.snapshot(), new ExplorerViewSettings(
+				diagram,
+				polygonMode,
+				brocardIllumination,
+				showPolygonExterior,
+				showVisibilityCells,
+				stopAngle1,
+				stopAngle2
+		));
+	}
+
+	private void applyInstance(ExplorerInstance instance) {
+		state.applySnapshot(instance.snapshot());
+		ExplorerViewSettings view = instance.view();
+		diagram = view.diagramType();
+		polygonMode = view.polygonMode();
+		brocardIllumination = view.brocardIllumination();
+		showPolygonExterior = view.showPolygonExterior();
+		showVisibilityCells = view.showVisibilityCells();
+		stopAngle1 = view.stopAngle1();
+		stopAngle2 = view.stopAngle2();
+		diagramFrameCoordinator.markDirty();
 	}
 
 	private void drawVisibleLayers(View view) {
@@ -510,11 +594,132 @@ public class RVDExplorer implements Drawing {
 
 	@Override
 	public void receiveEvent(View view, InputEvent event, InputState state, Vector pointerWorld, Vector pointerViewBase) {
-		if (state.keyPressed(KeyCode.CONTROL)) {
+		if (ignoreControlModifierForCamera
+				&& (!state.keyPressed(KeyCode.CONTROL) || event.isKeyRelease(KeyCode.CONTROL))) {
+			ignoreControlModifierForCamera = false;
+		}
+
+		if (event.isKeyPress(KeyCode.S) && state.keyPressed(KeyCode.CONTROL)) {
+			saveInstanceToFile();
+			return;
+		}
+		if (event.isKeyPress(KeyCode.O) && state.keyPressed(KeyCode.CONTROL)) {
+			loadInstanceFromFile();
+			return;
+		}
+
+		boolean controlForCamera = state.keyPressed(KeyCode.CONTROL) && !ignoreControlModifierForCamera;
+		if (controlForCamera && !event.isKey()) {
 			camera.receiveEvent(view, event, state, pointerWorld, pointerViewBase);
 			return;
 		}
 		handleEditorInput(event, state, pointerWorld);
+	}
+
+	/** FileChooser needs a window; any showing JavaFX window is enough. */
+	private static Window firstShowingWindow() {
+		for (Window w : Window.getWindows()) {
+			if (w.isShowing()) {
+				return w;
+			}
+		}
+		return null;
+	}
+
+	private void afterNativeFileDialog() {
+		ignoreControlModifierForCamera = true;
+		Window w = firstShowingWindow();
+		if (w != null) {
+			Platform.runLater(w::requestFocus);
+		}
+	}
+
+	private void showErrorDialog(String header, String message) {
+		Platform.runLater(() -> {
+			String dialogKey = header + "\n" + message;
+			if (activeErrorAlert != null && activeErrorAlert.isShowing()) {
+				if (dialogKey.equals(activeErrorDialogKey)) {
+					focusActiveErrorAlert();
+					return;
+				}
+				activeErrorAlert.setHeaderText(header);
+				activeErrorAlert.setContentText(message);
+				activeErrorDialogKey = dialogKey;
+				focusActiveErrorAlert();
+				return;
+			}
+
+			Alert alert = new Alert(Alert.AlertType.ERROR);
+			alert.setTitle("RVD Explorer");
+			alert.setHeaderText(header);
+			alert.setContentText(message);
+			Window owner = firstShowingWindow();
+			if (owner != null) {
+				alert.initOwner(owner);
+			}
+			alert.setOnHidden(event -> {
+				if (activeErrorAlert == alert) {
+					activeErrorAlert = null;
+					activeErrorDialogKey = null;
+				}
+			});
+			activeErrorAlert = alert;
+			activeErrorDialogKey = dialogKey;
+			alert.show();
+		});
+	}
+
+	private void focusActiveErrorAlert() {
+		if (activeErrorAlert == null) {
+			return;
+		}
+		Window window = activeErrorAlert.getDialogPane().getScene() == null
+				? null
+				: activeErrorAlert.getDialogPane().getScene().getWindow();
+		if (window != null) {
+			window.requestFocus();
+		}
+	}
+
+	private void saveInstanceToFile() {
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Save instance");
+		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON instance", "*.json"));
+		File file = chooser.showSaveDialog(firstShowingWindow());
+		afterNativeFileDialog();
+		if (file == null) {
+			return;
+		}
+		if (!file.getName().toLowerCase().endsWith(".json")) {
+			file = new File(file.getParentFile(), file.getName() + ".json");
+		}
+		try {
+			ExplorerFileIo.save(file.toPath(), captureInstance());
+		} catch (IOException e) {
+			showErrorDialog("Save failed", e.getMessage());
+			System.err.println("Save failed: " + e.getMessage());
+		}
+	}
+
+	private void loadInstanceFromFile() {
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Load instance");
+		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON instance", "*.json"));
+		File file = chooser.showOpenDialog(firstShowingWindow());
+		afterNativeFileDialog();
+		if (file == null) {
+			return;
+		}
+		try {
+			applyInstance(ExplorerFileIo.load(file.toPath()));
+			kSelected = -1;
+		} catch (ExplorerJsonException e) {
+			showErrorDialog("Load failed", e.getMessage());
+			System.err.println("Load failed: " + e.getMessage());
+		} catch (IOException e) {
+			showErrorDialog("Load failed", e.getMessage());
+			System.err.println("Load failed: " + e.getMessage());
+		}
 	}
 
 

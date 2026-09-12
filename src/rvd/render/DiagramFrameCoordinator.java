@@ -5,9 +5,6 @@ import xyz.marsavic.drawingfx.drawing.View;
 import xyz.marsavic.geometry.Box;
 import xyz.marsavic.geometry.Transformation;
 
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-
 public class DiagramFrameCoordinator {
 
     @FunctionalInterface
@@ -15,7 +12,6 @@ public class DiagramFrameCoordinator {
         Image produce(Transformation tFromPixels, Box bImage);
     }
 
-    private String lastDataString = "";
     private Box lastNativeBox = Box.ZERO;
     private Transformation lastTransformation = Transformation.IDENTITY;
     private boolean diagramChanged = true;
@@ -25,13 +21,9 @@ public class DiagramFrameCoordinator {
         diagramChanged = true;
     }
 
-    public void updateInvalidationState(View view, String dataString, Consumer<String> dataLoader) {
-        if (!dataString.equals(lastDataString)) {
-            dataLoader.accept(dataString);
-        } else {
-            diagramChanged |= !lastNativeBox.equals(view.nativeBox());
-            diagramChanged |= !lastTransformation.equals(view.transformation());
-        }
+    public void updateInvalidationState(View view) {
+        diagramChanged |= !lastNativeBox.equals(view.nativeBox());
+        diagramChanged |= !lastTransformation.equals(view.transformation());
     }
 
     public void drawDiagram(View view, ImageProducer imageProducer) {
@@ -47,12 +39,9 @@ public class DiagramFrameCoordinator {
         view.setTransformation(t);
     }
 
-    public String syncFrameState(View view, Supplier<String> dataEncoder) {
-        String dataString = dataEncoder.get();
-        lastDataString = dataString;
+    public void syncFrameState(View view) {
         lastNativeBox = view.nativeBox();
         lastTransformation = view.transformation();
         diagramChanged = false;
-        return dataString;
     }
 }
