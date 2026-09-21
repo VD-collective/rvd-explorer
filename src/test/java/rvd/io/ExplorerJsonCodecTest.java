@@ -136,6 +136,66 @@ class ExplorerJsonCodecTest {
         assertTrue(ex.getMessage().contains("diagramType"));
     }
 
+    @Test
+    void omittedFieldsUseGadgetDefaults() throws Exception {
+        String json = """
+                {
+                  "version": "1",
+                  "sites": [
+                    { "x": 1, "y": 2, "angle": 0.25 },
+                    { "x": 3, "y": 4, "angle": 0.5, "enabled": false }
+                  ]
+                }
+                """;
+        ExplorerInstance instance = ExplorerJsonCodec.decode(json);
+
+        assertEquals(0.0, instance.snapshot().rotate(), 1e-12);
+        assertEquals(2, instance.snapshot().n());
+        assertTrue(instance.snapshot().enabled()[0]);
+        assertFalse(instance.snapshot().enabled()[1]);
+
+        ExplorerViewSettings view = instance.view();
+        assertEquals(DiagramType.RVD_RAYS_ORIENTED, view.diagramType());
+        assertTrue(view.polygonMode());
+        assertTrue(view.brocardIllumination());
+        assertFalse(view.showPolygonExterior());
+        assertFalse(view.showVisibilityCells());
+        assertEquals(1.0, view.stopAngle1(), 1e-12);
+        assertEquals(1.0, view.stopAngle2(), 1e-12);
+    }
+
+    @Test
+    void rejectsNonFiniteCoordinate() {
+        String json = """
+                {
+                  "version": "1",
+                  "rotate": 0.0,
+                  "n": 1,
+                  "sites": [{ "x": 1e309, "y": 0, "angle": 0, "enabled": true }],
+                  "diagramType": "RVD_RAYS_ORIENTED",
+                  "polygonMode": false,
+                  "brocardIllumination": false,
+                  "showPolygonExterior": false,
+                  "showVisibilityCells": false,
+                  "stopAngle1": 1.0,
+                  "stopAngle2": 1.0
+                }
+                """;
+        ExplorerJsonException ex = assertThrows(ExplorerJsonException.class, () -> ExplorerJsonCodec.decode(json));
+        assertTrue(ex.getMessage().contains("finite"));
+    }
+
+    @Test
+    void bundledDefaultIsUnorientedCaldamInstance() throws Exception {
+        ExplorerInstance instance = ExplorerFileIo.loadDefault();
+        assertEquals(6, instance.snapshot().n());
+        assertEquals(DiagramType.RVD_RAYS_UNORIENTED, instance.view().diagramType());
+        assertFalse(instance.view().polygonMode());
+        assertFalse(instance.view().brocardIllumination());
+        assertEquals(1.0, instance.view().stopAngle1(), 1e-12);
+        assertEquals(1.0, instance.view().stopAngle2(), 1e-12);
+    }
+
     private static ExplorerInstance sampleInstance() {
         Vector[] points = { Vector.xy(10, -20), Vector.xy(3, 4) };
         double[] angles = { 0.25, 0.75 };

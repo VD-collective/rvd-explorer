@@ -2,6 +2,7 @@ package rvd;
 
 import javafx.application.Platform;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
@@ -12,7 +13,6 @@ import rvd.core.DiskCellSelector;
 import rvd.core.NearestCellClassifier;
 import rvd.core.PolygonVisibility;
 import rvd.io.ExplorerFileIo;
-import rvd.io.ExplorerJsonCodec;
 import rvd.io.ExplorerJsonException;
 import rvd.model.ExplorerInstance;
 import rvd.model.ExplorerState;
@@ -40,80 +40,21 @@ import xyz.marsavic.utils.Numeric;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
 
 
 public class RVDExplorer implements Drawing {
 	public static final Vector sizeInitial = Vector.xy(800, 800);
 	public static final Vector gridCellD = Vector.xy(16, 16);
 
-	private final int maxN = 64;
-
-	/** Former Base64 datastring default, converted to JSON sites + current view defaults. */
-private static final String DEFAULT_INSTANCE_JSON = """
-		{
-		  "version": "1",
-		  "rotate": 0.0,
-  "n": 7,
-  "sites": [
-    {
-      "x": 1.0,
-      "y": 0.0,
-      "angle": 0.5957614938397598,
-      "enabled": true
-    },
-    {
-      "x": 3.0,
-      "y": 5.196152422706632,
-      "angle": 0.5957614938397598,
-      "enabled": true
-    },
-    {
-      "x": -3.0,
-      "y": 5.196152422706632,
-      "angle": 0.8333333333333333,
-      "enabled": true
-    },
-    {
-      "x": -6.0,
-      "y": 0.0,
-      "angle": 0.0,
-      "enabled": true
-    },
-    {
-      "x": -3.0,
-      "y": -5.196152422706632,
-      "angle": 0.1666666666666667,
-      "enabled": true
-    },
-    {
-      "x": 3.0,
-      "y": -5.196152422706632,
-      "angle": 0.3333333333333333,
-      "enabled": true
-    },
-    {
-      "x": 6.0,
-      "y": 0.0,
-      "angle": 0.5833333333333333,
-      "enabled": true
-    }
-  ],
-		  "diagramType": "RVD_RAYS_ORIENTED",
-		  "polygonMode": true,
-		  "brocardIllumination": false,
-		  "showPolygonExterior": false,
-		  "showVisibilityCells": false,
-		  "stopAngle1": 1.0,
-		  "stopAngle2": 1.0
-		}
-		""";
-
 	@GadgetBoolean
 	@Properties(name = "Help (h)")
 	boolean showHelp = false;
 
 	@RecurseGadgets
-	final ExplorerState state = new ExplorerState(maxN);
+	final ExplorerState state = new ExplorerState(ExplorerState.MAX_N);
 
 	@GadgetDouble
 	@Properties(name = "Max aperture")
@@ -189,7 +130,7 @@ private static final String DEFAULT_INSTANCE_JSON = """
 	@Properties(name = "Show visibility cells depth")
 	boolean visibilityCellsShadingCount = false;
 
-	double[] hues = new double[maxN];
+	double[] hues = new double[ExplorerState.MAX_N];
 	int kSelected = -1;
 
 	private Polygon polygon;
@@ -204,7 +145,7 @@ private static final String DEFAULT_INSTANCE_JSON = """
 	CameraSimple camera = new CameraSimple(F_R_R.cutoff01(t -> F_R_R.power(t, 8)));
 	double pixelWidth;
 
-	// After FileChooser, Control can stay pressed in InputState; ignore it for camera until released.
+	// After a file dialog, Control can stay pressed in InputState. Ignore it for the camera and for save/load until released.
 	private boolean ignoreControlModifierForCamera;
 	private Alert activeErrorAlert = null;
 	private String activeErrorDialogKey = null;
@@ -214,7 +155,7 @@ private static final String DEFAULT_INSTANCE_JSON = """
 		Sampler sampler = new Sampler(new Hash(0x5C727CC650E510C7L));
 
 		Box box = Box.cr(sizeInitial.div(2));
-		for (int k = 0; k < maxN; k++) {
+		for (int k = 0; k < ExplorerState.MAX_N; k++) {
 			state.points[k] = sampler.randomInBox(box.scaleFromCenter(2.0/3));
 //			state.points[k] = sampler.randomGaussian(box.r().min() / 2);
 			state.angles[k] = sampler.uniform();
@@ -223,8 +164,8 @@ private static final String DEFAULT_INSTANCE_JSON = """
 		}
 
 		try {
-			applyInstance(ExplorerJsonCodec.decode(DEFAULT_INSTANCE_JSON));
-		} catch (ExplorerJsonException e) {
+			applyInstance(ExplorerFileIo.loadDefault());
+		} catch (IOException | ExplorerJsonException e) {
 			throw new IllegalStateException("Default instance JSON is invalid", e);
 		}
 	}
@@ -237,9 +178,9 @@ private static final String DEFAULT_INSTANCE_JSON = """
 		return 360 * k * Numeric.PHI;
 	}
 
-	RVDColor[] colorsDiagram = new RVDColor[maxN];
+	RVDColor[] colorsDiagram = new RVDColor[ExplorerState.MAX_N];
 	{
-		for (int k = 0; k < maxN; k++) {
+		for (int k = 0; k < ExplorerState.MAX_N; k++) {
 			colorsDiagram[k]= new RVDColor(Color.hsb(hues[k], 0.6, 1.0));
 		}
 	}
@@ -594,16 +535,17 @@ private static final String DEFAULT_INSTANCE_JSON = """
 
 	@Override
 	public void receiveEvent(View view, InputEvent event, InputState state, Vector pointerWorld, Vector pointerViewBase) {
+		boolean suppressControlShortcuts = ignoreControlModifierForCamera;
 		if (ignoreControlModifierForCamera
 				&& (!state.keyPressed(KeyCode.CONTROL) || event.isKeyRelease(KeyCode.CONTROL))) {
 			ignoreControlModifierForCamera = false;
 		}
 
-		if (event.isKeyPress(KeyCode.S) && state.keyPressed(KeyCode.CONTROL)) {
+		if (!suppressControlShortcuts && event.isKeyPress(KeyCode.S) && state.keyPressed(KeyCode.CONTROL)) {
 			saveInstanceToFile();
 			return;
 		}
-		if (event.isKeyPress(KeyCode.O) && state.keyPressed(KeyCode.CONTROL)) {
+		if (!suppressControlShortcuts && event.isKeyPress(KeyCode.O) && state.keyPressed(KeyCode.CONTROL)) {
 			loadInstanceFromFile();
 			return;
 		}
@@ -690,15 +632,47 @@ private static final String DEFAULT_INSTANCE_JSON = """
 		if (file == null) {
 			return;
 		}
-		if (!file.getName().toLowerCase().endsWith(".json")) {
-			file = new File(file.getParentFile(), file.getName() + ".json");
+		Path path = jsonSavePath(file.toPath());
+		if (path == null) {
+			return;
 		}
 		try {
-			ExplorerFileIo.save(file.toPath(), captureInstance());
+			ExplorerFileIo.save(path, captureInstance());
 		} catch (IOException e) {
 			showErrorDialog("Save failed", e.getMessage());
 			System.err.println("Save failed: " + e.getMessage());
 		}
+	}
+
+	/**
+	 * Keeps a {@code .json} suffix. When that changes the path and the new file already exists,
+	 * asks before replacing it, because the save dialog confirmed the original name.
+	 * Returns null when the user declines.
+	 */
+	private Path jsonSavePath(Path chosen) {
+		String name = chosen.getFileName().toString();
+		if (name.toLowerCase(Locale.ROOT).endsWith(".json")) {
+			return chosen;
+		}
+		Path withSuffix = chosen.resolveSibling(name + ".json");
+		if (!withSuffix.equals(chosen) && Files.exists(withSuffix) && !confirmOverwrite(withSuffix)) {
+			return null;
+		}
+		return withSuffix;
+	}
+
+	private boolean confirmOverwrite(Path path) {
+		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+		alert.setTitle("RVD Explorer");
+		alert.setHeaderText("Replace existing file?");
+		alert.setContentText(path.toString());
+		Window owner = firstShowingWindow();
+		if (owner != null) {
+			alert.initOwner(owner);
+		}
+		boolean confirmed = alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+		afterNativeFileDialog();
+		return confirmed;
 	}
 
 	private void loadInstanceFromFile() {

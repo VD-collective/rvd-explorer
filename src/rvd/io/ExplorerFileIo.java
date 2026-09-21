@@ -3,6 +3,7 @@ package rvd.io;
 import rvd.model.ExplorerInstance;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,5 +20,16 @@ public final class ExplorerFileIo {
     public static ExplorerInstance load(Path path) throws IOException, ExplorerJsonException {
         String json = Files.readString(path, StandardCharsets.UTF_8);
         return ExplorerJsonCodec.decode(json);
+    }
+
+    /** Bundled startup instance, packaged next to this class. */
+    public static ExplorerInstance loadDefault() throws IOException, ExplorerJsonException {
+        try (InputStream in = ExplorerFileIo.class.getResourceAsStream("default-instance.json")) {
+            if (in == null) {
+                throw new IOException("Missing default instance");
+            }
+            String json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            return ExplorerJsonCodec.decode(json);
+        }
     }
 }

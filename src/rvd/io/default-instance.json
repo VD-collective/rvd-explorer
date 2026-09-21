@@ -1,0 +1,50 @@
+{
+  "version": "1",
+  "rotate": 0.0,
+  "n": 6,
+  "sites": [
+    {
+      "x": -19.0,
+      "y": 96.0,
+      "angle": 0.4412877804110024,
+      "enabled": true
+    },
+    {
+      "x": 135.0,
+      "y": 20.0,
+      "angle": 0.8015418488475887,
+      "enabled": true
+    },
+    {
+      "x": 206.0,
+      "y": 147.0,
+      "angle": 0.9050122072153868,
+      "enabled": true
+    },
+    {
+      "x": 51.0,
+      "y": -220.0,
+      "angle": 0.0,
+      "enabled": true
+    },
+    {
+      "x": -181.0,
+      "y": 266.0,
+      "angle": 0.7460527799086256,
+      "enabled": true
+    },
+    {
+      "x": -76.0,
+      "y": -60.0,
+      "angle": 0.3531722006850496,
+      "enabled": true
+    }
+  ],
+  "diagramType": "RVD_RAYS_UNORIENTED",
+  "polygonMode": false,
+  "brocardIllumination": false,
+  "showPolygonExterior": false,
+  "showVisibilityCells": false,
+  "stopAngle1": 1.0,
+  "stopAngle2": 1.0
+}

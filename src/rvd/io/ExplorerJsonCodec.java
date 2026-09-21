@@ -5,16 +5,20 @@ import com.google.gson.GsonBuilder;
 import rvd.DiagramType;
 import rvd.model.ExplorerInstance;
 import rvd.model.ExplorerSnapshot;
+import rvd.model.ExplorerState;
 import rvd.model.ExplorerViewSettings;
 import xyz.marsavic.geometry.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** Human-readable instance file: version, sites, and selected view settings. */
+/**
+ * Human-readable instance file. {@code version} and each site's {@code x}, {@code y}, and {@code angle}
+ * are required. Other fields fall back to the explorer gadget defaults when absent.
+ * Encoding still writes every field.
+ */
 public final class ExplorerJsonCodec {
     public static final String CURRENT_VERSION = "1";
-    public static final int MAX_SITES = 64;
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
@@ -80,47 +84,79 @@ public final class ExplorerJsonCodec {
         if (dto.sites == null) {
             throw new ExplorerJsonException("sites is required");
         }
-        if (dto.n < 1 || dto.n > MAX_SITES) {
-            throw new ExplorerJsonException("n must be between 1 and " + MAX_SITES);
+        int n = dto.n == null ? dto.sites.size() : dto.n;
+        if (n < 1 || n > ExplorerState.MAX_N) {
+            throw new ExplorerJsonException("n must be between 1 and " + ExplorerState.MAX_N);
         }
-        if (dto.sites.size() != dto.n) {
+        if (dto.sites.size() != n) {
             throw new ExplorerJsonException("sites length must equal n");
         }
+        double rotate = finiteOrDefault("rotate", dto.rotate, 0.0);
 
-        Vector[] points = new Vector[dto.n];
-        double[] angles = new double[dto.n];
-        boolean[] enabled = new boolean[dto.n];
-        for (int k = 0; k < dto.n; k++) {
+        Vector[] points = new Vector[n];
+        double[] angles = new double[n];
+        boolean[] enabled = new boolean[n];
+        for (int k = 0; k < n; k++) {
             SiteJson site = dto.sites.get(k);
             if (site == null) {
                 throw new ExplorerJsonException("sites[" + k + "] is required");
             }
-            if (site.x == null || site.y == null || site.angle == null || site.enabled == null) {
-                throw new ExplorerJsonException("sites[" + k + "] requires x, y, angle, enabled");
+            if (site.x == null || site.y == null || site.angle == null) {
+                throw new ExplorerJsonException("sites[" + k + "] requires x, y, angle");
             }
-            points[k] = Vector.xy(site.x, site.y);
-            angles[k] = site.angle;
-            enabled[k] = site.enabled;
+            points[k] = Vector.xy(
+                    requireFinite("sites[" + k + "].x", site.x),
+                    requireFinite("sites[" + k + "].y", site.y)
+            );
+            angles[k] = requireFinite("sites[" + k + "].angle", site.angle);
+            enabled[k] = site.enabled == null || site.enabled;
         }
 
         DiagramType diagramType = parseDiagramType(dto.diagramType);
+        boolean polygonMode = booleanOrDefault(dto.polygonMode, true);
+        boolean brocardIllumination = booleanOrDefault(dto.brocardIllumination, true);
+        boolean showPolygonExterior = booleanOrDefault(dto.showPolygonExterior, false);
+        boolean showVisibilityCells = booleanOrDefault(dto.showVisibilityCells, false);
+        double stopAngle1 = finiteOrDefault("stopAngle1", dto.stopAngle1, 1.0);
+        double stopAngle2 = finiteOrDefault("stopAngle2", dto.stopAngle2, 1.0);
 
-        ExplorerSnapshot snapshot = new ExplorerSnapshot(dto.rotate, dto.n, points, angles, enabled);
+        ExplorerSnapshot snapshot = new ExplorerSnapshot(rotate, n, points, angles, enabled);
         ExplorerViewSettings view = new ExplorerViewSettings(
                 diagramType,
-                dto.polygonMode,
-                dto.brocardIllumination,
-                dto.showPolygonExterior,
-                dto.showVisibilityCells,
-                dto.stopAngle1,
-                dto.stopAngle2
+                polygonMode,
+                brocardIllumination,
+                showPolygonExterior,
+                showVisibilityCells,
+                stopAngle1,
+                stopAngle2
         );
         return new ExplorerInstance(snapshot, view);
     }
 
+    private static boolean booleanOrDefault(Boolean value, boolean fallback) {
+        return value == null ? fallback : value;
+    }
+
+    private static double finiteOrDefault(String field, Double value, double fallback) throws ExplorerJsonException {
+        if (value == null) {
+            return fallback;
+        }
+        return requireFinite(field, value);
+    }
+
+    private static double requireFinite(String field, Double value) throws ExplorerJsonException {
+        if (value == null) {
+            throw new ExplorerJsonException(field + " is required");
+        }
+        if (!Double.isFinite(value)) {
+            throw new ExplorerJsonException(field + " must be finite");
+        }
+        return value;
+    }
+
     private static DiagramType parseDiagramType(String name) throws ExplorerJsonException {
         if (name == null || name.isEmpty()) {
-            throw new ExplorerJsonException("diagramType is required");
+            return DiagramType.RVD_RAYS_ORIENTED;
         }
         try {
             return DiagramType.valueOf(name);
@@ -131,16 +167,16 @@ public final class ExplorerJsonCodec {
 
     static final class InstanceFileV1 {
         String version;
-        double rotate;
-        int n;
+        Double rotate;
+        Integer n;
         List<SiteJson> sites;
         String diagramType;
-        boolean polygonMode;
-        boolean brocardIllumination;
-        boolean showPolygonExterior;
-        boolean showVisibilityCells;
-        double stopAngle1;
-        double stopAngle2;
+        Boolean polygonMode;
+        Boolean brocardIllumination;
+        Boolean showPolygonExterior;
+        Boolean showVisibilityCells;
+        Double stopAngle1;
+        Double stopAngle2;
     }
 
     static final class SiteJson {
