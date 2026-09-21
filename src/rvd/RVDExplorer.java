@@ -1,15 +1,22 @@
 package rvd;
 
+import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
+import javafx.stage.FileChooser;
+import javafx.stage.Window;
 import rvd.core.DiagramPreparation;
 import rvd.core.DominanceRegionFactory;
 import rvd.core.DiskCellSelector;
 import rvd.core.NearestCellClassifier;
 import rvd.core.PolygonVisibility;
-import rvd.io.ExplorerDataCodec;
-import rvd.model.ExplorerSnapshot;
+import rvd.io.ExplorerFileIo;
+import rvd.io.ExplorerJsonException;
+import rvd.model.ExplorerInstance;
 import rvd.model.ExplorerState;
+import rvd.model.ExplorerViewSettings;
 import rvd.render.BrocardTracker;
 import rvd.render.DiagramFrameCoordinator;
 import rvd.render.HelpOverlayDrawer;
@@ -31,27 +38,23 @@ import xyz.marsavic.random.sampling.Sampler;
 import xyz.marsavic.utils.Hash;
 import xyz.marsavic.utils.Numeric;
 
-enum DiagramType {
-	RVD_RAYS_ORIENTED, RVD_RAYS_UNORIENTED, RVD_LINES, DISK_DIAGRAM
-}
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
 
 
 public class RVDExplorer implements Drawing {
 	public static final Vector sizeInitial = Vector.xy(800, 800);
 	public static final Vector gridCellD = Vector.xy(16, 16);
 
-	private final int maxN = 64;
-
 	@GadgetBoolean
 	@Properties(name = "Help (h)")
 	boolean showHelp = false;
 
-	@GadgetString
-	@Properties(name = "Data String")
-	String dataString = "rO0ABXoAAAHOAAAAAAAAAAAAAAASQE+AAAAAAADANgAAAAAAAD/RI++HH+QVAUA5AAAAAAAAQHPAAAAAAAA/4Pne7C5yLAHARQAAAAAAAEBy8AAAAAAAP+gyHxB0iNkBwD0AAAAAAADAQYAAAAAAAD/TRHIvdh0DAcBgYAAAAAAAQHEAAAAAAAA/4kplNrs9TwHAZ6AAAAAAAEBugAAAAAAAP+j+t2xMBQABwFyAAAAAAADAYOAAAAAAAD/XOrCUFp4CAcBuQAAAAAAAQCwAAAAAAAA/4oc8EYd5zgHAc6AAAAAAAMA5AAAAAAAAP+ru8xZW8P0BwGkgAAAAAADAaOAAAAAAAD/sTJsOBK9AAcBXQAAAAAAAwHJwAAAAAAA/dTFG2BgVNwFAYyAAAAAAAMBx8AAAAAAAP8WHD651nQIBQGkgAAAAAADAaUAAAAAAAD/Jt2jYeCQXAUBy4AAAAAAAQFzAAAAAAAA/2XICjs75hAFAcCAAAAAAAEBigAAAAAAAP+VYCjrljjYBQGNAAAAAAADAQIAAAAAAAD/MrdmdrBhQAUBpgAAAAAAAQHDwAAAAAAA/3G85j2AqXQFAYaAAAAAAAEByYAAAAAAAP+bEe81fa/AB";
-
 	@RecurseGadgets
-	final ExplorerState state = new ExplorerState(maxN);
+	final ExplorerState state = new ExplorerState(ExplorerState.MAX_N);
 
 	@GadgetDouble
 	@Properties(name = "Max aperture")
@@ -127,7 +130,7 @@ public class RVDExplorer implements Drawing {
 	@Properties(name = "Show visibility cells depth")
 	boolean visibilityCellsShadingCount = false;
 
-	double[] hues = new double[maxN];
+	double[] hues = new double[ExplorerState.MAX_N];
 	int kSelected = -1;
 
 	private Polygon polygon;
@@ -142,31 +145,28 @@ public class RVDExplorer implements Drawing {
 	CameraSimple camera = new CameraSimple(F_R_R.cutoff01(t -> F_R_R.power(t, 8)));
 	double pixelWidth;
 
-
-
-	private String dataAsString() {
-		return ExplorerDataCodec.encode(state.snapshot());
-	}
-
-
-	private void stringToData(String data) {
-		ExplorerSnapshot snapshot = ExplorerDataCodec.decode(data);
-		if (snapshot != null) {
-			state.applySnapshot(snapshot);
-		}
-	}
+	// After a file dialog, Control can stay pressed in InputState. Ignore it for the camera and for save/load until released.
+	private boolean ignoreControlModifierForCamera;
+	private Alert activeErrorAlert = null;
+	private String activeErrorDialogKey = null;
 
 
 	{
 		Sampler sampler = new Sampler(new Hash(0x5C727CC650E510C7L));
 
 		Box box = Box.cr(sizeInitial.div(2));
-		for (int k = 0; k < maxN; k++) {
+		for (int k = 0; k < ExplorerState.MAX_N; k++) {
 			state.points[k] = sampler.randomInBox(box.scaleFromCenter(2.0/3));
 //			state.points[k] = sampler.randomGaussian(box.r().min() / 2);
 			state.angles[k] = sampler.uniform();
 			state.enabled[k] = true;
 			hues[k] = 360 * k * Numeric.PHI;
+		}
+
+		try {
+			applyInstance(ExplorerFileIo.loadDefault());
+		} catch (IOException | ExplorerJsonException e) {
+			throw new IllegalStateException("Default instance JSON is invalid", e);
 		}
 	}
 
@@ -178,9 +178,9 @@ public class RVDExplorer implements Drawing {
 		return 360 * k * Numeric.PHI;
 	}
 
-	RVDColor[] colorsDiagram = new RVDColor[maxN];
+	RVDColor[] colorsDiagram = new RVDColor[ExplorerState.MAX_N];
 	{
-		for (int k = 0; k < maxN; k++) {
+		for (int k = 0; k < ExplorerState.MAX_N; k++) {
 			colorsDiagram[k]= new RVDColor(Color.hsb(hues[k], 0.6, 1.0));
 		}
 	}
@@ -335,11 +335,36 @@ public class RVDExplorer implements Drawing {
 
 
 	private void updateDrawInvalidationState(View view) {
-		diagramFrameCoordinator.updateInvalidationState(view, dataString, this::stringToData);
+		diagramFrameCoordinator.updateInvalidationState(view);
 	}
 
 	private void syncFrameState(View view) {
-		dataString = diagramFrameCoordinator.syncFrameState(view, this::dataAsString);
+		diagramFrameCoordinator.syncFrameState(view);
+	}
+
+	private ExplorerInstance captureInstance() {
+		return new ExplorerInstance(state.snapshot(), new ExplorerViewSettings(
+				diagram,
+				polygonMode,
+				brocardIllumination,
+				showPolygonExterior,
+				showVisibilityCells,
+				stopAngle1,
+				stopAngle2
+		));
+	}
+
+	private void applyInstance(ExplorerInstance instance) {
+		state.applySnapshot(instance.snapshot());
+		ExplorerViewSettings view = instance.view();
+		diagram = view.diagramType();
+		polygonMode = view.polygonMode();
+		brocardIllumination = view.brocardIllumination();
+		showPolygonExterior = view.showPolygonExterior();
+		showVisibilityCells = view.showVisibilityCells();
+		stopAngle1 = view.stopAngle1();
+		stopAngle2 = view.stopAngle2();
+		diagramFrameCoordinator.markDirty();
 	}
 
 	private void drawVisibleLayers(View view) {
@@ -510,11 +535,165 @@ public class RVDExplorer implements Drawing {
 
 	@Override
 	public void receiveEvent(View view, InputEvent event, InputState state, Vector pointerWorld, Vector pointerViewBase) {
-		if (state.keyPressed(KeyCode.CONTROL)) {
+		boolean suppressControlShortcuts = ignoreControlModifierForCamera;
+		if (ignoreControlModifierForCamera
+				&& (!state.keyPressed(KeyCode.CONTROL) || event.isKeyRelease(KeyCode.CONTROL))) {
+			ignoreControlModifierForCamera = false;
+		}
+
+		if (!suppressControlShortcuts && event.isKeyPress(KeyCode.S) && state.keyPressed(KeyCode.CONTROL)) {
+			saveInstanceToFile();
+			return;
+		}
+		if (!suppressControlShortcuts && event.isKeyPress(KeyCode.O) && state.keyPressed(KeyCode.CONTROL)) {
+			loadInstanceFromFile();
+			return;
+		}
+
+		boolean controlForCamera = state.keyPressed(KeyCode.CONTROL) && !ignoreControlModifierForCamera;
+		if (controlForCamera && !event.isKey()) {
 			camera.receiveEvent(view, event, state, pointerWorld, pointerViewBase);
 			return;
 		}
 		handleEditorInput(event, state, pointerWorld);
+	}
+
+	/** FileChooser needs a window; any showing JavaFX window is enough. */
+	private static Window firstShowingWindow() {
+		for (Window w : Window.getWindows()) {
+			if (w.isShowing()) {
+				return w;
+			}
+		}
+		return null;
+	}
+
+	private void afterNativeFileDialog() {
+		ignoreControlModifierForCamera = true;
+		Window w = firstShowingWindow();
+		if (w != null) {
+			Platform.runLater(w::requestFocus);
+		}
+	}
+
+	private void showErrorDialog(String header, String message) {
+		Platform.runLater(() -> {
+			String dialogKey = header + "\n" + message;
+			if (activeErrorAlert != null && activeErrorAlert.isShowing()) {
+				if (dialogKey.equals(activeErrorDialogKey)) {
+					focusActiveErrorAlert();
+					return;
+				}
+				activeErrorAlert.setHeaderText(header);
+				activeErrorAlert.setContentText(message);
+				activeErrorDialogKey = dialogKey;
+				focusActiveErrorAlert();
+				return;
+			}
+
+			Alert alert = new Alert(Alert.AlertType.ERROR);
+			alert.setTitle("RVD Explorer");
+			alert.setHeaderText(header);
+			alert.setContentText(message);
+			Window owner = firstShowingWindow();
+			if (owner != null) {
+				alert.initOwner(owner);
+			}
+			alert.setOnHidden(event -> {
+				if (activeErrorAlert == alert) {
+					activeErrorAlert = null;
+					activeErrorDialogKey = null;
+				}
+			});
+			activeErrorAlert = alert;
+			activeErrorDialogKey = dialogKey;
+			alert.show();
+		});
+	}
+
+	private void focusActiveErrorAlert() {
+		if (activeErrorAlert == null) {
+			return;
+		}
+		Window window = activeErrorAlert.getDialogPane().getScene() == null
+				? null
+				: activeErrorAlert.getDialogPane().getScene().getWindow();
+		if (window != null) {
+			window.requestFocus();
+		}
+	}
+
+	private void saveInstanceToFile() {
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Save instance");
+		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON instance", "*.json"));
+		File file = chooser.showSaveDialog(firstShowingWindow());
+		afterNativeFileDialog();
+		if (file == null) {
+			return;
+		}
+		Path path = jsonSavePath(file.toPath());
+		if (path == null) {
+			return;
+		}
+		try {
+			ExplorerFileIo.save(path, captureInstance());
+		} catch (IOException e) {
+			showErrorDialog("Save failed", e.getMessage());
+			System.err.println("Save failed: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Keeps a {@code .json} suffix. When that changes the path and the new file already exists,
+	 * asks before replacing it, because the save dialog confirmed the original name.
+	 * Returns null when the user declines.
+	 */
+	private Path jsonSavePath(Path chosen) {
+		String name = chosen.getFileName().toString();
+		if (name.toLowerCase(Locale.ROOT).endsWith(".json")) {
+			return chosen;
+		}
+		Path withSuffix = chosen.resolveSibling(name + ".json");
+		if (!withSuffix.equals(chosen) && Files.exists(withSuffix) && !confirmOverwrite(withSuffix)) {
+			return null;
+		}
+		return withSuffix;
+	}
+
+	private boolean confirmOverwrite(Path path) {
+		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+		alert.setTitle("RVD Explorer");
+		alert.setHeaderText("Replace existing file?");
+		alert.setContentText(path.toString());
+		Window owner = firstShowingWindow();
+		if (owner != null) {
+			alert.initOwner(owner);
+		}
+		boolean confirmed = alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK;
+		afterNativeFileDialog();
+		return confirmed;
+	}
+
+	private void loadInstanceFromFile() {
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Load instance");
+		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON instance", "*.json"));
+		File file = chooser.showOpenDialog(firstShowingWindow());
+		afterNativeFileDialog();
+		if (file == null) {
+			return;
+		}
+		try {
+			applyInstance(ExplorerFileIo.load(file.toPath()));
+			kSelected = -1;
+		} catch (ExplorerJsonException e) {
+			showErrorDialog("Load failed", e.getMessage());
+			System.err.println("Load failed: " + e.getMessage());
+		} catch (IOException e) {
+			showErrorDialog("Load failed", e.getMessage());
+			System.err.println("Load failed: " + e.getMessage());
+		}
 	}
 
 

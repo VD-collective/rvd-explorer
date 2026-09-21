@@ -7,7 +7,9 @@ import xyz.marsavic.geometry.Vector;
 
 public class ExplorerState {
 
-    @GadgetInteger(min = 1, max = 64)
+    public static final int MAX_N = 64;
+
+    @GadgetInteger(min = 1, max = MAX_N)
     @Properties(name = "Number of sites")
     public int n = 7;
 

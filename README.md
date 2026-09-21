@@ -63,6 +63,7 @@ Screenshot of **RVD explorer** with an unoriented rotating rays Voronoi diagram 
 - **Max aperture** — Upper bound on the aperture (slider).
 - **Current aperture (%)** — Explore coverage at a **fraction** of that maximum.
 - **Rotate rays** — Adjust ray directions interactively.
+- **Save / load** — **Ctrl+S** and **Ctrl+O** write and read the rays and main view settings as JSON.
 - **Help** — Opens the **full list** of shortcuts and options.
 
 ### Domains: plane vs polygon
@@ -210,6 +211,7 @@ Prebuilt **`rvd-explorer.jar`** may be attached to **GitHub Releases** when you 
 | Kind | Artifact |
 |------|-----------|
 | Local JARs (in `libs/`) | `libs/drawing-fx-2-2022-03-18.jar`, `libs/mars-bits-2026-03-18.jar` |
+| JSON | Gson 2.11.0 (Maven Central), for instance save and load |
 | Tests | JUnit 5 (via `junit-bom` on Maven Central) |
 
 JavaFX comes from the **JDK+FX** install, not from Maven in this project.
